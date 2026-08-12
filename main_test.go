@@ -348,7 +348,9 @@ func TestRenderRecusaTelaAcimaDoLimiteDeArea(t *testing.T) {
 	}{
 		{"escala 100", []string{"render", "basico.yaml", "--scale", "100"}, "area-escala-100.txt"},
 		{"escala 10000", []string{"render", "basico.yaml", "--scale", "10000"}, "area-escala-10000.txt"},
-		{"escala 100 com export por Camada", []string{"render", "basico.yaml", "--scale", "100", "--layers"}, "area-escala-100.txt"},
+		// O export por Camada não tem Chrome — Notas não aparecem nele — então
+		// a área recusada é a do Frame puro, menor que a do render anotado.
+		{"escala 100 com export por Camada", []string{"render", "basico.yaml", "--scale", "100", "--layers"}, "area-escala-100-camadas.txt"},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
