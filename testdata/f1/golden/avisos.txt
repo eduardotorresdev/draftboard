@@ -1,0 +1,2 @@
+aviso: avisos.yaml: frames[0].layers[0].elements[0]: Elemento fora do Frame: será recortado na borda
+aviso: avisos.yaml: frames[0].layers[0].elements[1]: Elemento de área zero: não aparecerá no desenho

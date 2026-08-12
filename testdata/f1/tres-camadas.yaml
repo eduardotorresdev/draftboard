@@ -1,0 +1,14 @@
+frames:
+  - name: Home Page
+    w: 100
+    h: 100
+    layers:
+      - name: fundo
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 100}
+      - name: conteudo
+        elements:
+          - rect: {x: 10, y: 10, w: 50, h: 50}
+      - name: modal
+        elements:
+          - rect: {x: 20, y: 20, w: 30, h: 30}

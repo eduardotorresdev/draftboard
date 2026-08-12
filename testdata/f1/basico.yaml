@@ -1,0 +1,19 @@
+frames:
+  - name: home
+    w: 1280
+    h: 800
+    layers:
+      - name: fundo
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 50}
+            id: topo
+          - rect: {x: 10, y: 10, w: 30, h: 20}
+            id: cartao
+            round: true
+            note: "Cartão do topo"
+          - circle: {x: 12, y: 12, d: 4}
+            id: avatar
+      - name: conteudo
+        elements:
+          - rect: {x: 0, y: 60, w: 50, h: 20}
+          - circle: {x: 0, y: 60, d: 10}

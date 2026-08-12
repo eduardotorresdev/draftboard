@@ -1,0 +1,1 @@
+erro: slot-em-documento.yaml: frames[0].layers[0].elements[0]: Slot só pode ser declarado em Componente, não em Documento

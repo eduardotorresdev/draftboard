@@ -1,0 +1,8 @@
+frames:
+  - name: home
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: "muito", h: 10}

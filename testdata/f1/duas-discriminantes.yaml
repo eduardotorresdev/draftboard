@@ -1,0 +1,9 @@
+frames:
+  - name: home
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 10, h: 10}
+            circle: {x: 0, y: 0, d: 10}

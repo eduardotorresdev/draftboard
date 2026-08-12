@@ -1,0 +1,1 @@
+erro: tipo-invalido.yaml: frames[0].layers[0].elements[0].rect: campo "w" espera número, encontrou texto

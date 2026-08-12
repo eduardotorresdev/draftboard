@@ -1,0 +1,15 @@
+frames:
+  - name: home
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 100}
+  - name: perfil
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 100}

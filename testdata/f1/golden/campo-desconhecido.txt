@@ -1,0 +1,1 @@
+erro: campo-desconhecido.yaml: frames[0].layers[0].elements[0]: campo desconhecido "rond"; você quis dizer "round"?

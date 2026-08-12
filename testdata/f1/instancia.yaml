@@ -1,0 +1,9 @@
+frames:
+  - name: home
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./cartao.yaml"
+            box: {x: 0, y: 0, w: 50, h: 50}

@@ -1,0 +1,1 @@
+erro: frame-largura-zero.yaml: frames[0]: campo "w" é obrigatório e deve ser maior que zero

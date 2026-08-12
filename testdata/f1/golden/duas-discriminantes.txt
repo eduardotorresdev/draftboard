@@ -1,0 +1,1 @@
+erro: duas-discriminantes.yaml: frames[0].layers[0].elements[0]: mais de uma chave discriminante no mesmo nó de elemento: "rect", "circle"

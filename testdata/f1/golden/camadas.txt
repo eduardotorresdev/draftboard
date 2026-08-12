@@ -1,0 +1,8 @@
+documento camadas
+  frame tela 100x100
+    camada conteudo
+      fundo retangulo 0,0 100x100 tom=300 elev=1
+    camada separador
+    camada modal
+      caixa retangulo 20,20 60x60 tom=500 elev=4
+      botao retangulo 30,30 20x20 tom=300 elev=5

@@ -1,0 +1,1 @@
+erro: repeticao-n.yaml: frames[0].layers[0].elements[0].repeat: campo "n" da Repetição deve ser no mínimo 1

@@ -1,0 +1,4 @@
+frames:
+  - name: home
+    w: .inf
+    h: 800

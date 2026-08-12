@@ -1,0 +1,11 @@
+documento profundo
+  frame pilha 1000x1000
+    camada unica
+      e0 retangulo 0,0 1000x1000 tom=300 elev=1
+      e1 retangulo 50,50 900x900 tom=500 elev=2
+      e2 retangulo 100,100 800x800 tom=700 elev=3
+      e3 retangulo 150,150 700x700 tom=500 elev=4
+      e4 retangulo 200,200 600x600 tom=300 elev=5
+      e5 retangulo 250,250 500x500 tom=100 elev=6
+      e6 retangulo 300,300 400x400 tom=300 elev=7
+      e7 retangulo 350,350 300x300 tom=500 elev=8
