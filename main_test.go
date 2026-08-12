@@ -3,16 +3,31 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/eduardotorresdev/draftboard/internal/notes"
+	"github.com/eduardotorresdev/draftboard/internal/render"
+	"github.com/eduardotorresdev/draftboard/internal/scene"
 )
 
 // atualiza regrava os golden files a partir da saída observada.
 var atualiza = flag.Bool("atualiza", false, "regrava os golden files de testdata/f1")
+
+// TestMain garante que nenhum teste deixe imagem no diretório do pacote: todo
+// caso que invoca `render` tem de escrever numa pasta descartável.
+func TestMain(m *testing.M) {
+	flag.Parse()
+	codigo := m.Run()
+	if sujeira, err := filepath.Glob("*.webp"); err == nil && len(sujeira) > 0 {
+		fmt.Fprintf(os.Stderr, "testes deixaram imagens no diretório do pacote: %v\n", sujeira)
+		codigo = 1
+	}
+	os.Exit(codigo)
+}
 
 // executa roda a CLI como se fosse a linha de comando e devolve o código de
 // saída, o stdout e o stderr. É o seam primário dos testes: nenhum deles
@@ -354,19 +369,37 @@ func TestRenderRecusaTelaAcimaDoLimiteDeArea(t *testing.T) {
 	}
 }
 
-// TestRenderAceitaTelaExatamenteNoLimite fixa que o teto é inclusivo: uma tela
-// de exatamente render.LimiteDeArea pixels ainda renderiza.
-func TestRenderAceitaTelaExatamenteNoLimite(t *testing.T) {
-	pasta := numaPastaTemporaria(t, "teto-exato.yaml")
-	codigo, stdout, stderr := executa("render", "teto-exato.yaml")
-	if codigo != 0 {
-		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+// TestTetoDeAreaFechaNoLimite fixa a borda do teto nas três posições que
+// importam. A aceitação não passa pelo rasterizador de propósito: uma tela de
+// render.LimiteDeArea pixels leva minutos para virar WebP, e o que está sob
+// teste é a decisão, não o desenho. A recusa acima do teto continua sendo
+// exercitada ponta a ponta pela CLI, onde é rápida porque nada é alocado.
+func TestTetoDeAreaFechaNoLimite(t *testing.T) {
+	casos := []struct {
+		nome                           string
+		l, a                           int
+		escala                         float64
+		margemT, margemD, margemB, arE float64
+		cabe                           bool
+	}{
+		{nome: "um pixel abaixo do teto", l: render.LimiteDeArea - 1, a: 1, escala: 1, cabe: true},
+		{nome: "exatamente no teto", l: render.LimiteDeArea, a: 1, escala: 1, cabe: true},
+		{nome: "um pixel acima do teto", l: render.LimiteDeArea + 1, a: 1, escala: 1, cabe: false},
+		{nome: "o Chrome empurra a tela acima do teto", l: render.LimiteDeArea, a: 1, escala: 1, arE: 1, cabe: false},
+		{nome: "a escala empurra a tela acima do teto", l: render.LimiteDeArea / 4, a: 1, escala: 2.1, cabe: false},
 	}
-	if stdout != "teto-exato-teto.webp\n" {
-		t.Errorf("stdout = %q, queria %q", stdout, "teto-exato-teto.webp\n")
-	}
-	if nomes := listaDeArquivos(t, pasta); len(nomes) != 2 {
-		t.Errorf("arquivos = %v, queria a fixture mais uma imagem", nomes)
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			o := opcoes{arquivo: "documento.yaml", saida: ".", escala: c.escala}
+			f := scene.Frame{Nome: "tela", L: c.l, A: c.a}
+			err := cabeNaTela(o, 0, f, c.margemT, c.margemD, c.margemB, c.arE)
+			if c.cabe && err != nil {
+				t.Errorf("tela recusada, queria aceita: %v", err)
+			}
+			if !c.cabe && err == nil {
+				t.Error("tela aceita, queria recusada pelo teto de área")
+			}
+		})
 	}
 }
 
