@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"image"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -569,35 +570,57 @@ func TestMedeTexto(t *testing.T) {
 	}
 }
 
-// Texto pinta na tela e trata y como o topo da linha: nada é desenhado acima
-// de y.
+// Texto trata y como o TOPO da linha, não como a linha de base. A âncora é
+// verificada de forma exata: "H" se apoia na linha de base, então a última
+// linha de pixels com tinta é a imediatamente acima dela, e a linha de base
+// fica em y + subida. Um deslocamento de um único pixel quebra este teste — é
+// o que garante que F4 possa empilhar Notas por altura.
 func TestTextoTrataYComoTopoDaLinha(t *testing.T) {
 	const topo = 40
-	c := NewCanvas(300, 100, 0, 0, 0, 0, 1)
-	c.Texto(10, topo, "Hxg", 24, scene.TomChrome)
-	img := decodifica(t, codifica(t, c))
 
-	fundo := scene.TomFrame.Cinza()
-	primeiraLinhaPintada := -1
-	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y && primeiraLinhaPintada < 0; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			if tomEm(img, x, y) != fundo {
-				primeiraLinhaPintada = y
-				break
+	for _, tamanho := range []float64{9, 12, 16, 24, 48} {
+		c := NewCanvas(300, 140, 0, 0, 0, 0, 1)
+		c.Texto(10, topo, "H", tamanho, scene.TomChrome)
+		img := decodifica(t, codifica(t, c))
+
+		fundo := scene.TomFrame.Cinza()
+		primeira, ultima := -1, -1
+		b := img.Bounds()
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				if tomEm(img, x, y) != fundo {
+					if primeira < 0 {
+						primeira = y
+					}
+					ultima = y
+					break
+				}
 			}
 		}
-	}
-	if primeiraLinhaPintada < 0 {
-		t.Fatalf("Texto não pintou nada")
-	}
-	if primeiraLinhaPintada < topo {
-		t.Errorf("Texto pintou na linha %d, acima do topo %d", primeiraLinhaPintada, topo)
-	}
-	_, altura := c.MedeTexto("Hxg", 24)
-	if float64(primeiraLinhaPintada) > topo+altura {
-		t.Errorf("Texto começou em %d, abaixo da caixa de linha que termina em %v",
-			primeiraLinhaPintada, topo+altura)
+		if primeira < 0 {
+			t.Fatalf("tamanho %v: Texto não pintou nada", tamanho)
+		}
+
+		// Nada pode ser pintado acima do topo declarado.
+		if primeira < topo {
+			t.Errorf("tamanho %v: Texto pintou na linha %d, acima do topo %d",
+				tamanho, primeira, topo)
+		}
+
+		// E a linha de base tem de cair exatamente em topo + subida.
+		subida, altura := metricas(c.face(tamanho))
+		querUltima := int(math.Round(topo+subida)) - 1
+		if ultima != querUltima {
+			t.Errorf("tamanho %v: última linha com tinta = %d, quer %d; "+
+				"a linha de base não está em topo + subida (%.2f)",
+				tamanho, ultima, querUltima, topo+subida)
+		}
+
+		// E a tinta toda cabe na caixa de linha devolvida por MedeTexto.
+		if float64(ultima) > topo+altura {
+			t.Errorf("tamanho %v: tinta até %d passa da caixa de linha que "+
+				"termina em %.2f", tamanho, ultima, topo+altura)
+		}
 	}
 }
 

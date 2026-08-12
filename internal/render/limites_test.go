@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"math"
 	"strings"
 	"testing"
@@ -186,6 +187,7 @@ func TestDimensoesSaturamNoLimiteDeArea(t *testing.T) {
 		{"escala 100 satura", 1280, 800, 100, true},
 		{"escala 1000 satura", 1280, 800, 1000, true},
 		{"escala 10000 satura", 1280, 800, 10000, true},
+		{"escala infinita satura", 1280, 800, math.Inf(1), true},
 	}
 	for _, caso := range casos {
 		t.Run(caso.nome, func(t *testing.T) {
@@ -217,32 +219,6 @@ func TestDimensoesSaturamNoLimiteDeArea(t *testing.T) {
 				t.Errorf("proporção %v, quer %v", temProporcao, querProporcao)
 			}
 		})
-	}
-}
-
-// §5b — NewCanvas com escala absurda devolve um Canvas utilizável em vez de
-// entrar em pânico ou ir para o swap.
-func TestNewCanvasComEscalaAbsurdaNaoEntraEmPanico(t *testing.T) {
-	if testing.Short() {
-		t.Skip("aloca a tela inteira do teto de área")
-	}
-	feito := make(chan [2]int, 1)
-	go func() {
-		c := NewCanvas(1280, 800, 0, 0, 0, 0, 10000)
-		feito <- [2]int{c.dc.Width(), c.dc.Height()}
-	}()
-	select {
-	case dim := <-feito:
-		if dim[0] < 1 || dim[1] < 1 {
-			t.Fatalf("tela degenerada: %dx%d", dim[0], dim[1])
-		}
-		if dim[0] > LimiteDeArea/dim[1] {
-			t.Errorf("tela %dx%d = %d px passa do teto %d", dim[0], dim[1], dim[0]*dim[1], LimiteDeArea)
-		}
-		t.Logf("escala 10000 saturou em %dx%d = %d px (~%d MB de RGBA)",
-			dim[0], dim[1], dim[0]*dim[1], dim[0]*dim[1]*4>>20)
-	case <-time.After(60 * time.Second):
-		t.Fatalf("NewCanvas não retornou em 60s")
 	}
 }
 
@@ -499,5 +475,216 @@ func TestArredondadoCortadoNaoGanhaCantoEspurio(t *testing.T) {
 	// Já o canto direito, que é do Elemento de verdade, continua arredondado.
 	if got := tomEm(img, margem+90-1, margem+20); got == alvo {
 		t.Errorf("o canto direito do Elemento deixou de ser arredondado")
+	}
+}
+
+// B1 — nenhuma escala degenerada pode derrubar NewCanvas. +Inf chegava a
+// produzir uma tela de 9223372036854775807 px de lado e estourava o gg.
+func TestNewCanvasComEscalaDegeneradaNaoEntraEmPanico(t *testing.T) {
+	casos := []struct {
+		nome   string
+		escala float64
+	}{
+		{"zero", 0},
+		{"negativa", -1},
+		{"NaN", math.NaN()},
+		{"menos infinito", math.Inf(-1)},
+		{"mais infinito", math.Inf(1)},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nome, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("NewCanvas entrou em pânico: %v", r)
+				}
+			}()
+			c := NewCanvas(1280, 800, 30, 20, 30, 20, caso.escala)
+
+			l, a := c.dc.Width(), c.dc.Height()
+			if l < 1 || a < 1 {
+				t.Fatalf("tela degenerada: %dx%d", l, a)
+			}
+			if l > LimiteDeArea/a {
+				t.Errorf("tela %dx%d = %d px passa do teto %d", l, a, l*a, LimiteDeArea)
+			}
+
+			// A tela precisa ser utilizável de verdade, não só existir.
+			c.Texto(1, 1, "nota", 8, scene.TomFrame)
+
+			// Numa tela no teto de área, desenhar Elemento (que constrói a
+			// máscara) e codificar custariam dezenas de segundos sem acrescentar
+			// nada: o que importa aqui é não entrar em pânico e aceitar desenho.
+			if l*a <= 4<<20 {
+				c.DesenhaElemento(scene.Elemento{
+					Forma: scene.Retangulo, X: 10, Y: 10, L: 100, A: 50,
+					Elevacao: 1, Tom: scene.TomDaElevacao(1),
+				})
+				if err := c.CodificaWebP(io.Discard); err != nil {
+					t.Errorf("CodificaWebP: %v", err)
+				}
+			}
+			t.Logf("escala %v -> tela %dx%d", caso.escala, l, a)
+		})
+	}
+}
+
+// Q-A — um Retângulo arredondado que entra pouquíssimo no Frame pela esquerda
+// não pode ser esticado para dentro pelo recorte: a aresta direita fica onde o
+// Elemento realmente termina.
+func TestArredondadoQueMalEntraNoFrameNaoEstica(t *testing.T) {
+	const margem = 30
+	// Entra 1 px: vai de -199 a 1 no espaço do Frame.
+	e := scene.Elemento{
+		Forma: scene.Retangulo, X: -199, Y: 20, L: 200, A: 80,
+		Arredondado: true, Elevacao: 1, Tom: scene.TomDaElevacao(1),
+	}
+	c := NewCanvas(200, 120, margem, margem, margem, margem, 1)
+	c.DesenhaElemento(e)
+	img := decodifica(t, codifica(t, c))
+
+	alvo := e.Tom.Cinza()
+	meio := margem + 20 + 40 // meio da altura do Elemento, longe dos cantos
+
+	// A única coluna visível é a primeira do Frame.
+	if got := tomEm(img, margem, meio); got != alvo {
+		t.Errorf("coluna de entrada (%d,%d) = %#x, quer o Tom do Elemento %#x",
+			margem, meio, got, alvo)
+	}
+	// E nada além dela: o Elemento termina em x = 1 do espaço do Frame.
+	for dx := 1; dx <= 8; dx++ {
+		x := margem + dx
+		if got := tomEm(img, x, meio); got == alvo {
+			t.Fatalf("o Elemento foi esticado para dentro do Frame até (%d,%d)", x, meio)
+		}
+	}
+}
+
+// Q-C — o polígono do Círculo gigante tem de ter a forma do Círculo, não só
+// "não travar". Comparamos com o desenho exato do gg logo acima do limite em
+// que o caminho gigante entra.
+func TestPoligonoDoCirculoGiganteTemAFormaDoCirculo(t *testing.T) {
+	const margem = 0
+	novo := func() *Canvas { return NewCanvas(200, 120, margem, margem, margem, margem, 1) }
+
+	limite := novo().limiteDeTracado()
+	// Logo acima do limite: o caminho gigante entra, e o Círculo exato ainda é
+	// barato de desenhar como referência.
+	r := limite * 1.05
+	lado := 2 * r
+
+	casos := []struct {
+		nome string
+		x, y float64
+	}{
+		{"borda cruzando pela esquerda", -lado + 60, -r + 60},
+		{"borda cruzando pelo topo", -r + 100, -lado + 40},
+		{"cobrindo o Frame", -r + 100, -r + 60},
+	}
+
+	for _, caso := range casos {
+		t.Run(caso.nome, func(t *testing.T) {
+			e := scene.Elemento{
+				Forma: scene.Circulo, X: caso.x, Y: caso.y, L: lado, A: lado,
+				Elevacao: 1, Tom: scene.TomDaElevacao(1),
+			}
+
+			obtido := novo()
+			obtido.DesenhaElemento(e)
+			imgObtido := decodifica(t, codifica(t, obtido))
+
+			esperado := novo()
+			esperado.desenhaCirculoExato(e)
+			imgEsperado := decodifica(t, codifica(t, esperado))
+
+			difere, maiorDelta := 0, 0
+			b := imgObtido.Bounds()
+			for y := b.Min.Y; y < b.Max.Y; y++ {
+				for x := b.Min.X; x < b.Max.X; x++ {
+					d := int(tomEm(imgObtido, x, y)) - int(tomEm(imgEsperado, x, y))
+					if d < 0 {
+						d = -d
+					}
+					if d > 0 {
+						difere++
+					}
+					if d > maiorDelta {
+						maiorDelta = d
+					}
+				}
+			}
+
+			// A divergência aceitável é a coluna de antialiasing da borda.
+			if maiorDelta > 12 {
+				t.Errorf("o polígono não segue o Círculo: maior delta %d (limite 12), "+
+					"%d px diferem", maiorDelta, difere)
+			}
+			if difere > b.Dx()*b.Dy()/100 {
+				t.Errorf("%d px diferem de %d: mais que 1%% da tela", difere, b.Dx()*b.Dy())
+			}
+			t.Logf("%d px diferem, maior delta %d", difere, maiorDelta)
+		})
+	}
+}
+
+// desenhaCirculoExato pinta o Círculo pelo caminho exato do gg, sem o polígono.
+// Serve de referência para o teste acima.
+func (c *Canvas) desenhaCirculoExato(e scene.Elemento) {
+	x := (c.margemE + e.X) * c.escala
+	y := (c.margemT + e.Y) * c.escala
+	l, a := e.L*c.escala, e.A*c.escala
+
+	_ = c.dc.SetMask(c.mascaraDoFrame())
+	c.dc.SetColor(cor(e.Tom))
+	c.dc.DrawCircle(x+l/2, y+a/2, math.Min(l, a)/2)
+	c.dc.Fill()
+	c.dc.ResetClip()
+}
+
+// Q-D — largura máxima não-positiva não pode truncar nem entrar em laço: cada
+// palavra vai para a sua linha.
+func TestQuebraTextoComLarguraNaoPositiva(t *testing.T) {
+	c := NewCanvas(200, 120, 0, 0, 0, 0, 1)
+	const texto = "uma frase com cinco palavras"
+
+	for _, larguraMax := range []float64{0, -10} {
+		linhas := c.QuebraTexto(texto, 12, larguraMax)
+		if got, quer := len(linhas), 5; got != quer {
+			t.Errorf("larguraMax %v: %d linhas, quer %d (%q)", larguraMax, got, quer, linhas)
+		}
+		if got, quer := strings.Join(linhas, " "), texto; got != quer {
+			t.Errorf("larguraMax %v: texto truncado\n got %q\nquer %q", larguraMax, got, quer)
+		}
+	}
+}
+
+// B1b — dimensoesDaTela garante o teto de área por conta própria, sem depender
+// de a escala já ter sido reduzida. É a segunda tranca: foi confiar numa única
+// guarda que deixou +Inf chegar até a alocação.
+func TestDimensoesDaTelaGarantemOTetoSozinhas(t *testing.T) {
+	casos := []struct {
+		nome            string
+		largura, altura float64
+		escala          float64
+	}{
+		{"escala não reduzida", 1280, 800, 100},
+		{"escala absurda", 1280, 800, 1e6},
+		{"escala infinita", 1280, 800, math.Inf(1)},
+		{"frame já enorme", 1e6, 1e6, 1},
+		{"tira larga", 1e9, 1, 1},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nome, func(t *testing.T) {
+			// Sem passar por escalaQueCabeNoTeto de propósito.
+			l, a := dimensoesDaTela(caso.largura, caso.altura, caso.escala)
+
+			if l < 1 || a < 1 {
+				t.Fatalf("dimensões degeneradas: %dx%d", l, a)
+			}
+			if l > LimiteDeArea/a {
+				t.Errorf("%dx%d = %d px passa do teto %d", l, a, l*a, LimiteDeArea)
+			}
+			t.Logf("%v x %v @ %v -> %dx%d = %d px", caso.largura, caso.altura,
+				caso.escala, l, a, l*a)
+		})
 	}
 }

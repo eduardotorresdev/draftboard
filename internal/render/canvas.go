@@ -160,30 +160,16 @@ func (c *Canvas) tracaRetangulo(e scene.Elemento, x, y, l, a, fx0, fy0, fx1, fy1
 	r, folga := 0.0, 0.0
 	if e.Arredondado {
 		r = c.raio(e)
+		// A folga é o raio: os cantos que o corte cria ficam a pelo menos um
+		// raio da borda do Frame e portanto nunca aparecem. O pixel a mais é
+		// margem para a fronteira que cai em fração de pixel.
 		folga = r + 1
 	}
 
 	x0, y0 := math.Max(x, fx0-folga), math.Max(y, fy0-folga)
 	x1, y1 := math.Min(x+l, fx1+folga), math.Min(y+a, fy1+folga)
 
-	// A caixa recortada precisa continuar comportando o raio nos cantos que
-	// sobreviveram ao corte. Crescemos para o lado que foi cortado, que por
-	// construção está fora do Frame e portanto é invisível.
 	if r > 0 {
-		if x1-x0 < 2*r {
-			if x0 > x {
-				x0 = x1 - 2*r
-			} else {
-				x1 = x0 + 2*r
-			}
-		}
-		if y1-y0 < 2*r {
-			if y0 > y {
-				y0 = y1 - 2*r
-			} else {
-				y1 = y0 + 2*r
-			}
-		}
 		c.dc.DrawRoundedRectangle(x0, y0, x1-x0, y1-y0, r)
 		return
 	}
@@ -257,6 +243,8 @@ func (c *Canvas) tracaCirculoGigante(cx, cy, r, fx0, fy0, fx1, fy1 float64) {
 	for i := len(esquerda) - 1; i >= 0; i-- {
 		c.dc.LineTo(esquerda[i][0], esquerda[i][1])
 	}
+	// Fechar é redundante — gg.Fill fecha subcaminhos abertos por conta
+	// própria — mas deixa o polígono explícito na leitura.
 	c.dc.ClosePath()
 }
 
@@ -362,10 +350,14 @@ func (c *Canvas) retanguloDoFrame() (x0, y0, x1, y1 float64) {
 // mesmo quando as margens caem em fração de pixel.
 func (c *Canvas) mascaraDoFrame() *image.Alpha {
 	if c.recorte == nil {
-		m := image.NewAlpha(image.Rect(0, 0, c.dc.Width(), c.dc.Height()))
+		larg, alt := c.dc.Width(), c.dc.Height()
+		m := image.NewAlpha(image.Rect(0, 0, larg, alt))
 		x0, y0, x1, y1 := c.retanguloDoFrame()
-		r := image.Rect(arredonda(x0), arredonda(y0), arredonda(x1), arredonda(y1))
-		draw.Draw(m, r.Intersect(m.Bounds()), image.NewUniform(color.Alpha{A: 0xFF}), image.Point{}, draw.Src)
+		r := image.Rect(
+			pixelSeguro(x0, larg), pixelSeguro(y0, alt),
+			pixelSeguro(x1, larg), pixelSeguro(y1, alt),
+		)
+		draw.Draw(m, r, image.NewUniform(color.Alpha{A: 0xFF}), image.Point{}, draw.Src)
 		c.recorte = m
 	}
 	return c.recorte
@@ -374,7 +366,10 @@ func (c *Canvas) mascaraDoFrame() *image.Alpha {
 // escalaQueCabeNoTeto reduz a escala até que a tela caiba em LimiteDeArea,
 // preservando a proporção. Escala que já cabe volta intacta.
 func escalaQueCabeNoTeto(largura, altura, escala float64) float64 {
-	if !finito(escala) || escala <= 0 || largura <= 0 || altura <= 0 {
+	// NaN e escala não-positiva não têm tela possível: a conversão para pixels
+	// resolve devolvendo a tela mínima. +Inf, esse sim, precisa saturar — é o
+	// caminho que levaria a alocar sem teto.
+	if math.IsNaN(escala) || escala <= 0 || largura <= 0 || altura <= 0 {
 		return escala
 	}
 	maxEscala := math.Sqrt(LimiteDeArea / (largura * altura))
@@ -384,20 +379,34 @@ func escalaQueCabeNoTeto(largura, altura, escala float64) float64 {
 	return escala
 }
 
+// ladoDaTela converte uma medida do espaço do Frame em pixels da tela: o
+// inteiro mais próximo, nunca menor que 1 nem maior que o teto de área — um
+// lado sozinho já não pode passar disso. Medida não-numérica vira 1.
+func ladoDaTela(v float64) int {
+	if math.IsNaN(v) || v <= 1 {
+		return 1
+	}
+	if v >= LimiteDeArea {
+		return LimiteDeArea
+	}
+	return int(math.Round(v))
+}
+
 // dimensoesDaTela converte as medidas do espaço do Frame em pixels da tela.
-// O produto é arredondado para o inteiro mais próximo; se o arredondamento
-// estourar o teto de área, cai para o inteiro abaixo.
+// Além do arredondamento, garante — aconteça o que acontecer com a escala —
+// que a tela caiba em LimiteDeArea, preservando a proporção.
 func dimensoesDaTela(largura, altura, escala float64) (l, a int) {
-	l, a = arredonda(largura*escala), arredonda(altura*escala)
-	if l >= 1 && a >= 1 && l > LimiteDeArea/a {
-		l, a = int(math.Floor(largura*escala)), int(math.Floor(altura*escala))
-	}
-	// Uma tela sem pixel nenhum não é codificável; garantimos ao menos 1x1.
-	if l < 1 {
-		l = 1
-	}
-	if a < 1 {
-		a = 1
+	l, a = ladoDaTela(largura*escala), ladoDaTela(altura*escala)
+
+	if l > LimiteDeArea/a {
+		fator := math.Sqrt(float64(LimiteDeArea) / (float64(l) * float64(a)))
+		l, a = int(float64(l)*fator), int(float64(a)*fator)
+		if l < 1 {
+			l = 1
+		}
+		if a < 1 {
+			a = 1
+		}
 	}
 	return l, a
 }
@@ -409,14 +418,14 @@ func cor(t scene.Tom) color.Color {
 	return color.NRGBA{R: v, G: v, B: v, A: 0xFF}
 }
 
-// arredonda converte px de dispositivo fracionários no inteiro mais próximo.
-// É a regra única de arredondamento de toda a rasterização.
-func arredonda(v float64) int {
-	if v > LimiteDeArea {
-		return LimiteDeArea
-	}
-	if v < 0 {
+// pixelSeguro arredonda uma coordenada de dispositivo para um índice de pixel
+// dentro de [0, max]. Coordenada não-numérica vira 0.
+func pixelSeguro(v float64, max int) int {
+	if math.IsNaN(v) || v <= 0 {
 		return 0
+	}
+	if v >= float64(max) {
+		return max
 	}
 	return int(math.Round(v))
 }
