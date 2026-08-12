@@ -157,3 +157,22 @@ type Aviso struct {
 func (a Aviso) String() string {
 	return "aviso: " + a.Arquivo + ": " + a.Local + ": " + a.Msg
 }
+
+// Erro é um problema que impede a resolução. Carrega arquivo e localização para
+// que a mensagem aponte o ponto exato em cadeias de Componentes.
+type Erro struct {
+	// Arquivo é o caminho do arquivo YAML onde o problema foi detectado.
+	Arquivo string
+	// Local é o caminho de chaves YAML dentro do arquivo, atravessando a
+	// cadeia de Componentes. Ex.: "frames[0].layers[0].elements[2] -> ./card.yaml: elements[1]".
+	Local string
+	// Msg descreve o problema em português, usando o vocabulário do domínio.
+	Msg string
+}
+
+func (e *Erro) Error() string {
+	if e.Local == "" {
+		return e.Arquivo + ": " + e.Msg
+	}
+	return e.Arquivo + ": " + e.Local + ": " + e.Msg
+}

@@ -55,6 +55,20 @@ type Aviso struct { Arquivo, Local, Msg string }
 
 `scene.Documento` é achatado: Instâncias, Slots e Repetições **já não existem** nele.
 
+### 1b. Entrada da resolução (dono F1)
+
+```go
+package resolve
+
+// Arquivo lê o Documento no caminho dado, valida, achata Instâncias, Slots e
+// Repetições, e calcula Elevação e Tom de cada Elemento.
+// Devolve erro do tipo *scene.Erro quando a resolução falha.
+func Arquivo(caminho string) (*scene.Documento, []scene.Aviso, error)
+```
+
+`scene.Erro` (congelado, já em `internal/scene`): campos `Arquivo`, `Local`, `Msg`;
+`Error()` devolve `"<arquivo>: <local>: <msg>"`. A CLI prefixa `erro: ` ao imprimir.
+
 ## 2. Schema YAML (congelado)
 
 Tipo do arquivo inferido pelo conteúdo: tem `frames` → **Documento**; senão → **Componente**.
