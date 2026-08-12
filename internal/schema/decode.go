@@ -484,10 +484,8 @@ func (l *leitor) booleano(m *mapaLido, campo string) (bool, error) {
 }
 
 // dimensao lê uma dimensão de Frame em pixels: obrigatória e maior que zero.
+// Campo ausente é lido como zero e cai na mesma mensagem.
 func (l *leitor) dimensao(m *mapaLido, campo string) (int, error) {
-	if m.valores[campo] == nil {
-		return 0, l.erro(m.local, "campo %q é obrigatório e deve ser maior que zero", campo)
-	}
 	v, err := l.numero(m, campo)
 	if err != nil {
 		return 0, err

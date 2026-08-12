@@ -1,0 +1,1 @@
+erro: repeticao.yaml: frames[0].layers[0].elements[0]: Repetição ainda não implementada

@@ -41,6 +41,9 @@ func interpretaRender(args []string) (opcoes, error) {
 			if err != nil {
 				return o, err
 			}
+			if v == "" {
+				return o, fmt.Errorf("opção %q espera um diretório, encontrou valor vazio", a)
+			}
 			o.saida = v
 		case "--scale", "-scale":
 			v, err := valorDe(args, &i, a)

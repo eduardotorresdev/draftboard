@@ -29,7 +29,10 @@ func comandoRender(args []string, stdout, stderr io.Writer) int {
 		return imprimeErro(stderr, err)
 	}
 	if err := os.MkdirAll(o.saida, 0o755); err != nil {
-		return imprimeErro(stderr, &scene.Erro{Arquivo: o.saida, Msg: "não foi possível criar o diretório de saída"})
+		// Erro de linha de comando não tem arquivo nem localização: não usa
+		// o formato de `scene.Erro`.
+		fmt.Fprintf(stderr, "erro: não foi possível criar o diretório de saída %q\n", o.saida)
+		return 1
 	}
 	for _, f := range doc.Frames {
 		caminhos, err := escreveFrame(o, doc.Nome, f)

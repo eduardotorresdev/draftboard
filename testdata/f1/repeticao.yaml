@@ -1,0 +1,9 @@
+frames:
+  - name: home
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 10, h: 10}
+            repeat: {n: 3, axis: y, gap: 2}

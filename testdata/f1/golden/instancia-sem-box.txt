@@ -1,0 +1,1 @@
+erro: instancia-sem-box.yaml: frames[0].layers[0].elements[0]: Instância exige o campo "box"
