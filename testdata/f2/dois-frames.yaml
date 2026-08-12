@@ -1,0 +1,21 @@
+# Dois Frames que instanciam o mesmo Componente com o mesmo id: os caminhos se
+# repetem entre Frames, e devem, porque a unicidade é por Frame.
+frames:
+  - name: topo
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./emblema.yaml"
+            box: {x: 0, y: 0, w: 100, h: 50}
+            id: c
+  - name: base
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./emblema.yaml"
+            box: {x: 0, y: 50, w: 100, h: 50}
+            id: c

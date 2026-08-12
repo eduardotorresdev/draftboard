@@ -1,0 +1,9 @@
+documento dois-frames
+  frame topo 100x100
+    camada base
+      c/faixa retangulo 0,0 100x50 tom=300 elev=1 de=emblema.yaml
+      c/ponto circulo 2,5 6x6 tom=500 elev=2 de=emblema.yaml
+  frame base 100x100
+    camada base
+      c/faixa retangulo 0,50 100x50 tom=300 elev=1 de=emblema.yaml
+      c/ponto circulo 2,55 6x6 tom=500 elev=2 de=emblema.yaml

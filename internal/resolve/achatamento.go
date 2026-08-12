@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 	"github.com/eduardotorresdev/draftboard/internal/schema"
@@ -13,6 +14,15 @@ import (
 // de Instâncias pode atravessar. Passar dele é erro: recursão acidental falha
 // rápido em vez de consumir memória até o processo morrer.
 const LimiteDeProfundidade = 16
+
+// LimiteDeClones é o número máximo de clones de uma única Repetição.
+const LimiteDeClones = 1_000
+
+// LimiteDeElementos é o número máximo de Elementos materializados num Frame.
+// Repetições encadeadas por Componentes multiplicam: oito Componentes com
+// `repeat: {n: 10}` cada, dentro do limite de profundidade, materializariam 10⁸
+// Elementos a partir de um punhado de bytes de YAML.
+const LimiteDeElementos = 10_000
 
 // espaco é o retângulo em pixels do Frame onde um espaço de coordenadas local
 // de 0 a 100 está projetado. O espaço do Frame é o próprio Frame na origem; o
@@ -86,7 +96,11 @@ func (r *resolucao) achata(nos []schema.No, esp espaco, prefixo string, ctx cont
 		caminho := junta(prefixo, segmento(no, i))
 		clones, passo := 1, 0.0
 		if no.Repeticao != nil {
-			clones = no.Repeticao.N
+			quantos, err := r.clones(no, ctx)
+			if err != nil {
+				return err
+			}
+			clones = quantos
 			passo = tamanhoNoEixo(no, no.Repeticao.Eixo) + no.Repeticao.Intervalo
 		}
 		for c := 0; c < clones; c++ {
@@ -110,6 +124,19 @@ func (r *resolucao) achata(nos []schema.No, esp espaco, prefixo string, ctx cont
 	return nil
 }
 
+// clones devolve a quantidade de clones de uma Repetição, recusando o valor
+// acima do teto. O teto existe porque Repetições encadeadas por Componentes
+// multiplicam: sem ele, poucos bytes de YAML materializam Elementos sem fim.
+func (r *resolucao) clones(no schema.No, ctx contexto) (int, error) {
+	n := no.Repeticao.N
+	if n > LimiteDeClones {
+		return 0, r.erro(ctx.prefixo+no.Local+".repeat",
+			`campo "n" da Repetição deve estar entre 1 e %d, encontrou %s`,
+			LimiteDeClones, strconv.FormatFloat(n, 'g', -1, 64))
+	}
+	return int(n), nil
+}
+
 // materializa resolve um nó, já deslocado por dx e dy no espaço local pela
 // Repetição que o clonou.
 func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminho string, ctx contexto, dest *[]scene.Elemento) error {
@@ -117,30 +144,37 @@ func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminh
 	case schema.TipoRetangulo:
 		c := desloca(*no.Retangulo, dx, dy)
 		x, y, l, a := esp.retangulo(c)
-		r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+		return r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
 	case schema.TipoCirculo:
 		d := *no.Circulo
 		d.X, d.Y = d.X+dx, d.Y+dy
 		x, y, l, a := esp.circulo(d)
-		r.acrescenta(dest, no, caminho, ctx, scene.Circulo, x, y, l, a)
-	case schema.TipoInstancia:
-		return r.instancia(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
-	default:
+		return r.acrescenta(dest, no, caminho, ctx, scene.Circulo, x, y, l, a)
+	case schema.TipoSlot:
 		return r.slot(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
+	default:
+		return r.instancia(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
 	}
-	return nil
 }
 
 // instancia expande uma Instância: carrega o Componente e achata seus nós no
 // espaço local que a caixa da Instância abriu.
 func (r *resolucao) instancia(no schema.No, esp espaco, caixa schema.Caixa, caminho string, ctx contexto, dest *[]scene.Elemento) error {
-	comp, interno, err := r.carrega(no.Componente, ctx.prefixo+no.Local, ctx)
+	x, y, l, a := esp.retangulo(caixa)
+	return r.expande(no.Componente, ctx.prefixo+no.Local, ctx,
+		preenchimentosDaInstancia(no, ctx),
+		espaco{X: x, Y: y, L: l, A: a}, caminho, dest)
+}
+
+// expande carrega o Componente referenciado e achata seus nós no espaço dado.
+// É o caminho comum da Instância e do Slot preenchido por Componente.
+func (r *resolucao) expande(referencia, local string, ctx contexto, preenchimentos map[string]preenchimento, esp espaco, caminho string, dest *[]scene.Elemento) error {
+	comp, interno, err := r.carrega(referencia, local, ctx)
 	if err != nil {
 		return err
 	}
-	interno.preenchimentos = preenchimentosDaInstancia(no, ctx)
-	x, y, l, a := esp.retangulo(caixa)
-	return r.achata(comp.Elementos, espaco{X: x, Y: y, L: l, A: a}, caminho, interno, dest)
+	interno.preenchimentos = preenchimentos
+	return r.achata(comp.Elementos, esp, caminho, interno, dest)
 }
 
 // preenchimentosDaInstancia amarra cada Slot preenchido pela Instância ao
@@ -174,11 +208,9 @@ func (r *resolucao) slot(no schema.No, esp espaco, caixa schema.Caixa, caminho s
 		if p.componente == "" {
 			return r.achata(p.nos, interno, caminho, p.ctx, dest)
 		}
-		comp, ctxDoComponente, err := r.carrega(p.componente, p.local, p.ctx)
-		if err != nil {
-			return err
-		}
-		return r.achata(comp.Elementos, interno, caminho, ctxDoComponente, dest)
+		// O preenchimento é resolvido contra o contexto de quem o
+		// escreveu, não contra o do Componente que declara o Slot.
+		return r.expande(p.componente, p.local, p.ctx, nil, interno, caminho, dest)
 	}
 
 	if no.Padrao != nil {
@@ -188,8 +220,7 @@ func (r *resolucao) slot(no schema.No, esp espaco, caixa schema.Caixa, caminho s
 	r.aviso(ctx.prefixo+no.Local, fmt.Sprintf(
 		"Slot %q%s sem preenchimento e sem conteúdo padrão: renderiza uma Superfície vazia",
 		no.Slot, declaradoEm(ctx)))
-	r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
-	return nil
+	return r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
 }
 
 func declaradoEm(ctx contexto) string {
@@ -241,9 +272,12 @@ func (r *resolucao) carrega(referencia, local string, ctx contexto) (*schema.Com
 	pilha = append(pilha, chave)
 	return comp, contexto{
 		prefixo: local + " -> " + referencia + ": ",
-		origem:  r.relativoAoDocumento(caminho),
-		dir:     filepath.Dir(caminho),
-		pilha:   pilha,
+		// A Origem é medida sobre o caminho absoluto: `de=` promete um
+		// caminho relativo ao Documento, e a referência pode ter sido
+		// escrita em qualquer forma.
+		origem: r.relativoAoDocumento(chave),
+		dir:    filepath.Dir(caminho),
+		pilha:  pilha,
 	}, nil
 }
 
@@ -272,9 +306,16 @@ func (r *resolucao) reposiciona(err error, local, referencia string) error {
 }
 
 // acrescenta materializa um Elemento com geometria já absoluta e emite os
-// avisos que dependem só da geometria.
-func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) {
+// avisos que dependem só da geometria. É o único ponto onde um Elemento nasce:
+// aqui o teto de materialização do Frame é conferido e o caminho é desambiguado.
+func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) error {
 	local := ctx.prefixo + no.Local
+	if r.materializados >= LimiteDeElementos {
+		return r.erro(local,
+			"o Frame %q materializou mais de %d Elementos: reduza a Repetição ou a cadeia de Componentes",
+			r.frameNome, LimiteDeElementos)
+	}
+	r.materializados++
 	if x < 0 || y < 0 || x+l > r.frameL || y+a > r.frameA {
 		r.aviso(local, "Elemento fora do Frame: será recortado na borda")
 	}
@@ -282,7 +323,7 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		r.aviso(local, "Elemento de área zero: não aparecerá no desenho")
 	}
 	*dest = append(*dest, scene.Elemento{
-		Caminho:     caminho,
+		Caminho:     r.caminhoUnico(caminho),
 		ID:          no.ID,
 		Forma:       forma,
 		X:           x,
@@ -293,6 +334,25 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		Origem:      ctx.origem,
 		Nota:        no.Nota,
 	})
+	return nil
+}
+
+// caminhoUnico garante que dois Elementos do mesmo Frame nunca compartilhem o
+// <caminho>: as duas regras de segmento podem colidir, como um Elemento com
+// `id: x` e um Slot chamado `x` no mesmo espaço. A repetição do caminho ganha o
+// sufixo ~2, ~3, ... na ordem de pintura, de forma determinística.
+func (r *resolucao) caminhoUnico(base string) string {
+	if !r.caminhos[base] {
+		r.caminhos[base] = true
+		return base
+	}
+	for n := 2; ; n++ {
+		c := fmt.Sprintf("%s~%d", base, n)
+		if !r.caminhos[c] {
+			r.caminhos[c] = true
+			return c
+		}
+	}
 }
 
 // desloca move uma caixa no espaço local, como faz a Repetição antes de
@@ -313,16 +373,20 @@ func tamanhoNoEixo(no schema.No, eixo string) float64 {
 			return no.Retangulo.L
 		}
 		return no.Retangulo.A
-	default:
+	case schema.TipoInstancia, schema.TipoSlot:
 		if eixo == "x" {
 			return no.Caixa.L
 		}
 		return no.Caixa.A
+	default:
+		return 0
 	}
 }
 
 // segmento devolve o segmento de caminho de um nó: o nome do Slot, o id
-// declarado, ou a posição do nó na sua lista.
+// declarado, ou a posição do nó na sua lista. O nome do Slot vem antes do id
+// porque é ele que o contrato usa nos exemplos de caminho; a colisão que isso
+// pode criar é desfeita por caminhoUnico.
 func segmento(no schema.No, i int) string {
 	if no.Tipo == schema.TipoSlot {
 		return no.Slot

@@ -1,0 +1,10 @@
+# Exatamente LimiteDeClones clones: o teto é inclusivo e o Documento resolve.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 0.1, h: 100}
+            repeat: {n: 1000, axis: x, gap: 0}

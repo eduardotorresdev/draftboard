@@ -27,9 +27,16 @@ func Arquivo(caminho string) (*scene.Documento, []scene.Aviso, error) {
 		return nil, nil, err
 	}
 
+	// O diretório do Documento é absolutizado: é contra ele que a Origem de
+	// cada Elemento é medida, e um Documento citado por caminho relativo com
+	// um Componente citado por caminho absoluto não teria denominador comum.
+	dir := filepath.Dir(caminho)
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
 	r := &resolucao{
 		arquivo:        caminho,
-		dirDoDocumento: filepath.Dir(caminho),
+		dirDoDocumento: dir,
 		componentes:    map[string]*schema.Componente{},
 	}
 	resolvido := &scene.Documento{Nome: doc.Nome}
@@ -55,9 +62,17 @@ type resolucao struct {
 	// componentes guarda cada Componente já decodificado pelo seu caminho
 	// absoluto, para que um Componente usado muitas vezes seja lido uma só.
 	componentes map[string]*schema.Componente
-	// frameL e frameA são as dimensões em pixels do Frame sendo achatado,
-	// usadas para detectar Elementos fora do Frame.
+	// frameNome, frameL e frameA descrevem o Frame sendo achatado: as
+	// dimensões detectam Elemento fora do Frame, e o nome entra na mensagem
+	// do teto de materialização.
+	frameNome      string
 	frameL, frameA float64
+	// materializados conta os Elementos já criados no Frame, contra
+	// LimiteDeElementos.
+	materializados int
+	// caminhos são os <caminho> já emitidos no Frame, para que dois
+	// Elementos nunca compartilhem o mesmo.
+	caminhos map[string]bool
 }
 
 func (r *resolucao) aviso(local, msg string) {
@@ -73,7 +88,11 @@ func (r *resolucao) erro(local, formato string, args ...any) error {
 // frame achata um Frame declarado: cada Camada vira uma lista plana de
 // Elementos com geometria absoluta, ainda sem Elevação nem Tom.
 func (r *resolucao) frame(f schema.Frame) (scene.Frame, error) {
-	r.frameL, r.frameA = float64(f.L), float64(f.A)
+	// Os dois tetos e a unicidade do caminho valem por Frame: cada Frame vira
+	// uma imagem, e é ele que a mensagem de erro nomeia.
+	r.frameNome, r.frameL, r.frameA = f.Nome, float64(f.L), float64(f.A)
+	r.materializados = 0
+	r.caminhos = map[string]bool{}
 	resolvido := scene.Frame{Nome: f.Nome, L: f.L, A: f.A}
 	// O espaço do Frame é o próprio Frame na origem: todo valor declarado é
 	// porcentagem do eixo correspondente.

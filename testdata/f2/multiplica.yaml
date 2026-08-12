@@ -1,0 +1,11 @@
+# Oito Componentes com repeat: {n: 10} cada, todos dentro do limite de
+# profundidade: 10^8 Elementos a partir de menos de 1 KB de YAML.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./multiplica/m1.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

@@ -1,0 +1,10 @@
+frames:
+  - name: tela
+    w: 200
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./barras.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}
+            id: bloco

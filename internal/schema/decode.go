@@ -422,7 +422,10 @@ func (l *leitor) repeticao(n *yaml.Node, local string) (Repeticao, error) {
 	if err != nil {
 		return Repeticao{}, err
 	}
-	r.N = int(math.Round(quantos))
+	// O arredondamento fica em float64: o teto de clones é da resolução, e a
+	// conversão para int de um valor que estoura o int64 depende de
+	// plataforma.
+	r.N = math.Round(quantos)
 	if r.N < 1 {
 		return Repeticao{}, l.erro(local, `campo "n" da Repetição deve ser no mínimo 1`)
 	}

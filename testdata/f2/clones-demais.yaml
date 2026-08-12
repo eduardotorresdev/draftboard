@@ -1,0 +1,9 @@
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 1, h: 1}
+            repeat: {n: 40000, axis: y, gap: 0}

@@ -1,0 +1,4 @@
+elements:
+  - use: "./m4.yaml"
+    box: {x: 0, y: 0, w: 10, h: 100}
+    repeat: {n: 10, axis: x, gap: 0}

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Testes do reuso: Componente, Instância, Slot e Repetição. Como em F1, o seam
@@ -208,6 +210,199 @@ func TestRepeticaoDeslocaCadaCloneEmTamanhoMaisIntervalo(t *testing.T) {
 		}
 	}
 	conferaGolden(t, "repeticao.txt", stdout)
+}
+
+// TestRepeticaoDentroDoComponenteUsaOEspacoLocal fixa que o intervalo de uma
+// Repetição escrita num Componente é medido no espaço local de 0 a 100, e só
+// depois convertido pela caixa da Instância — e que `n: 1` produz um clone.
+func TestRepeticaoDentroDoComponenteUsaOEspacoLocal(t *testing.T) {
+	naPastaDeReuso(t)
+	codigo, stdout, stderr := executa("inspect", "repeticao-em-componente.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+	}
+	casos := []struct{ caminho, queria string }{
+		// Passo local de (10 + 10)% sobre uma caixa de 200 px: 40 px.
+		{"bloco/barra#0", "0,0 20x100"},
+		{"bloco/barra#1", "40,0 20x100"},
+		{"bloco/barra#2", "80,0 20x100"},
+		// n: 1 materializa um único clone, sem deslocamento.
+		{"bloco/solo#0", "120,0 80x100"},
+	}
+	for _, c := range casos {
+		if linha := linhaDe(t, stdout, c.caminho); !strings.Contains(linha, c.queria) {
+			t.Errorf("%s: queria %q, obteve %q", c.caminho, c.queria, linha)
+		}
+	}
+	if strings.Contains(stdout, "solo#1") {
+		t.Error("Repetição com n: 1 materializou mais de um clone")
+	}
+	conferaGolden(t, "repeticao-em-componente.txt", stdout)
+}
+
+// TestIdentidadeDoComponenteEOCaminhoAbsoluto fixa que o Componente é
+// identificado pelo caminho absoluto: duas grafias do mesmo arquivo são o mesmo
+// Componente, e dois arquivos de mesmo nome em pastas diferentes não são.
+func TestIdentidadeDoComponenteEOCaminhoAbsoluto(t *testing.T) {
+	naPastaDeReuso(t)
+	codigo, stdout, stderr := executa("inspect", "identidade.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+	}
+	// "./emblema.yaml" e "./pecas/../emblema.yaml" são o mesmo Componente:
+	// mesmo conteúdo e mesma Origem, apesar da grafia diferente.
+	if linha := linhaDe(t, stdout, "rodeio/faixa"); !strings.Contains(linha, "de=emblema.yaml") {
+		t.Errorf("grafias diferentes do mesmo Componente divergiram: %s", linha)
+	}
+	// O homônimo em pecas/ tem conteúdo próprio: o cache não pode confundir
+	// os dois pelo nome do arquivo.
+	linha := linhaDe(t, stdout, "homonimo/bolha")
+	if !strings.Contains(linha, "circulo") || !strings.Contains(linha, "de=pecas/emblema.yaml") {
+		t.Errorf("homônimos em pastas diferentes colidiram: %s", linha)
+	}
+	conferaGolden(t, "identidade.txt", stdout)
+}
+
+// TestOrigemEhSempreRelativa fixa o que `scene.Elemento.Origem` promete: mesmo
+// com o `use` escrito em caminho absoluto, o `de=` da árvore sai relativo.
+func TestOrigemEhSempreRelativa(t *testing.T) {
+	componente, err := filepath.Abs(filepath.Join("testdata", "f2", "emblema.yaml"))
+	if err != nil {
+		t.Fatalf("caminho do Componente: %v", err)
+	}
+	pasta := t.TempDir()
+	documento := "documento.yaml"
+	conteudo := "frames:\n  - name: tela\n    w: 100\n    h: 100\n    layers:\n      - name: base\n" +
+		"        elements:\n          - use: \"" + componente + "\"\n            box: {x: 0, y: 0, w: 50, h: 50}\n"
+	if err := os.WriteFile(filepath.Join(pasta, documento), []byte(conteudo), 0o644); err != nil {
+		t.Fatalf("escrevendo o Documento: %v", err)
+	}
+	t.Chdir(pasta)
+	codigo, stdout, stderr := executa("inspect", documento)
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+	}
+	linha := linhaDe(t, stdout, "e0/faixa")
+	if strings.Contains(linha, "de="+string(filepath.Separator)) {
+		t.Errorf("a Origem vazou caminho absoluto: %s", linha)
+	}
+	if !strings.HasSuffix(linha, "emblema.yaml") {
+		t.Errorf("a Origem não aponta o Componente: %s", linha)
+	}
+}
+
+// --- Unicidade do caminho ---------------------------------------------------
+
+// TestCaminhoNuncaSeRepeteNoFrame cobre a colisão entre as duas regras de
+// segmento — um Elemento com `id: corpo` e um Slot chamado `corpo` no mesmo
+// espaço — e a precedência do nome do Slot sobre um id declarado no mesmo nó.
+func TestCaminhoNuncaSeRepeteNoFrame(t *testing.T) {
+	naPastaDeReuso(t)
+	codigo, stdout, stderr := executa("inspect", "colisao.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+	}
+	// O Elemento vem antes na ordem de pintura e fica com o caminho puro; a
+	// Superfície do Slot homônimo ganha o sufixo.
+	if linha := linhaDe(t, stdout, "c/corpo"); !strings.Contains(linha, "0,0 10x10") {
+		t.Errorf("o Elemento perdeu o caminho para o Slot homônimo: %s", linha)
+	}
+	if linha := linhaDe(t, stdout, "c/corpo~2"); !strings.Contains(linha, "20,20 50x50") {
+		t.Errorf("o Slot homônimo não foi desambiguado: %s", linha)
+	}
+	// O segmento de um Slot é o nome do Slot, mesmo quando o nó declara id.
+	linhaDe(t, stdout, "c/pe")
+	if strings.Contains(stdout, "c/outro") {
+		t.Error("o id do nó venceu o nome do Slot no segmento do caminho")
+	}
+	// Nenhum caminho pode aparecer duas vezes no Frame.
+	vistos := map[string]bool{}
+	for _, linha := range strings.Split(stdout, "\n") {
+		campos := strings.Fields(linha)
+		if len(campos) < 2 || !strings.HasPrefix(campos[0], "c/") {
+			continue
+		}
+		if vistos[campos[0]] {
+			t.Errorf("caminho repetido no Frame: %s", campos[0])
+		}
+		vistos[campos[0]] = true
+	}
+	conferaGolden(t, "colisao.txt", stderr+stdout)
+}
+
+// TestCaminhoEUnicoPorFrame fixa o alcance da regra: a unicidade é dentro de
+// cada Frame, então dois Frames que instanciam o mesmo Componente com o mesmo
+// id têm os mesmos caminhos, sem sufixo nenhum.
+func TestCaminhoEUnicoPorFrame(t *testing.T) {
+	naPastaDeReuso(t)
+	codigo, stdout, stderr := executa("inspect", "dois-frames.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+	}
+	if strings.Contains(stdout, "~") {
+		t.Errorf("caminho desambiguado entre Frames diferentes:\n%s", stdout)
+	}
+	if n := strings.Count(stdout, "c/faixa "); n != 2 {
+		t.Errorf("o caminho apareceu %d vezes, queria uma em cada Frame:\n%s", n, stdout)
+	}
+	conferaGolden(t, "dois-frames.txt", stdout)
+}
+
+// --- Tetos de materialização ------------------------------------------------
+
+// TestValidateRecusaMaterializacaoAcimaDoTeto fixa os dois tetos do contrato: o
+// de clones por Repetição e o de Elementos por Frame. Os dois existem porque
+// Repetições encadeadas por Componentes multiplicam, e a recusa tem que ser
+// imediata em vez de consumir memória até o processo morrer.
+func TestValidateRecusaMaterializacaoAcimaDoTeto(t *testing.T) {
+	casos := []struct{ nome, fixture, golden string }{
+		{"clones acima do teto", "clones-demais.yaml", "clones-demais.txt"},
+		{"um clone além do teto", "clones-1001.yaml", "clones-1001.txt"},
+		{"clones que estouram o int64", "clones-1e19.yaml", "clones-1e19.txt"},
+		{"clones em ordem de grandeza absurda", "clones-1e30.yaml", "clones-1e30.txt"},
+		{"Elementos acima do teto do Frame", "dez-mil-e-um.yaml", "dez-mil-e-um.txt"},
+		{"Repetições multiplicadas por Componentes", "multiplica.yaml", "multiplica.txt"},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			naPastaDeReuso(t)
+			inicio := time.Now()
+			codigo, stdout, stderr := executa("validate", c.fixture)
+			if decorrido := time.Since(inicio); decorrido > 10*time.Second {
+				t.Errorf("a recusa levou %v: o teto não está falhando rápido", decorrido)
+			}
+			if codigo != 1 {
+				t.Errorf("código de saída = %d, queria 1", codigo)
+			}
+			if stdout != "" {
+				t.Errorf("stdout = %q, queria vazio", stdout)
+			}
+			conferaGolden(t, c.golden, stderr)
+		})
+	}
+}
+
+// TestValidateAceitaMaterializacaoNoTeto fixa que os dois tetos são inclusivos.
+func TestValidateAceitaMaterializacaoNoTeto(t *testing.T) {
+	casos := []struct{ nome, fixture string }{
+		{"clones exatamente no teto", "clones-limite.yaml"},
+		{"Elementos exatamente no teto do Frame", "dez-mil.yaml"},
+		// O teto é por Frame: a soma dos dois passa de 10000, e nenhum
+		// deles passa sozinho.
+		{"dois Frames abaixo do teto cada um", "dois-frames-cheios.yaml"},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			naPastaDeReuso(t)
+			codigo, stdout, stderr := executa("validate", c.fixture)
+			if codigo != 0 {
+				t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+			}
+			if stdout != "" || stderr != "" {
+				t.Errorf("saída = (%q, %q), queria vazia nos dois", stdout, stderr)
+			}
+		})
+	}
 }
 
 // --- Erros ------------------------------------------------------------------

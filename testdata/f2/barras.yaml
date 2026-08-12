@@ -1,0 +1,9 @@
+# Repetição escrita dentro do Componente: o intervalo é medido no espaço local
+# de 0 a 100, e só depois convertido para pixels pela caixa da Instância.
+elements:
+  - rect: {x: 0, y: 0, w: 10, h: 100}
+    id: barra
+    repeat: {n: 3, axis: x, gap: 10}
+  - rect: {x: 60, y: 0, w: 40, h: 100}
+    id: solo
+    repeat: {n: 1, axis: y, gap: 5}

@@ -1,0 +1,21 @@
+# Dois Frames com 6000 Elementos cada: nenhum passa do teto sozinho, e a soma
+# passa. O teto é por Frame, então o Documento resolve.
+frames:
+  - name: topo
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./mil.yaml"
+            box: {x: 0, y: 0, w: 10, h: 100}
+            repeat: {n: 6, axis: x, gap: 0}
+  - name: base
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./mil.yaml"
+            box: {x: 0, y: 0, w: 10, h: 100}
+            repeat: {n: 6, axis: x, gap: 0}

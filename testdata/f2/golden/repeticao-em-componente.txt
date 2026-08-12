@@ -1,0 +1,7 @@
+documento repeticao-em-componente
+  frame tela 200x100
+    camada base
+      bloco/barra#0 retangulo 0,0 20x100 tom=300 elev=1 de=barras.yaml
+      bloco/barra#1 retangulo 40,0 20x100 tom=300 elev=1 de=barras.yaml
+      bloco/barra#2 retangulo 80,0 20x100 tom=300 elev=1 de=barras.yaml
+      bloco/solo#0 retangulo 120,0 80x100 tom=300 elev=1 de=barras.yaml

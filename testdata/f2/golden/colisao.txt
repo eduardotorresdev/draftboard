@@ -1,0 +1,8 @@
+aviso: colisao.yaml: frames[0].layers[0].elements[0] -> ./colide.yaml: elements[1]: Slot "corpo" do Componente colide.yaml sem preenchimento e sem conteúdo padrão: renderiza uma Superfície vazia
+aviso: colisao.yaml: frames[0].layers[0].elements[0] -> ./colide.yaml: elements[2]: Slot "pe" do Componente colide.yaml sem preenchimento e sem conteúdo padrão: renderiza uma Superfície vazia
+documento colisao
+  frame tela 100x100
+    camada base
+      c/corpo retangulo 0,0 10x10 tom=300 elev=1 de=colide.yaml
+      c/corpo~2 retangulo 20,20 50x50 tom=300 elev=1 de=colide.yaml
+      c/pe retangulo 0,80 100x10 tom=300 elev=1 de=colide.yaml

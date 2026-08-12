@@ -1,0 +1,8 @@
+documento identidade
+  frame tela 300x100
+    camada base
+      direto/faixa retangulo 0,0 90x100 tom=300 elev=1 de=emblema.yaml
+      direto/ponto circulo 2,10 5x5 tom=500 elev=2 de=emblema.yaml
+      rodeio/faixa retangulo 105,0 90x100 tom=300 elev=1 de=emblema.yaml
+      rodeio/ponto circulo 107,10 5x5 tom=500 elev=2 de=emblema.yaml
+      homonimo/bolha circulo 210,0 90x90 tom=300 elev=1 de=pecas/emblema.yaml

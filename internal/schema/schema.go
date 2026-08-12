@@ -78,8 +78,12 @@ type Disco struct{ X, Y, D float64 }
 
 // Repeticao é a clonagem de um nó ao longo de um eixo, com espaçamento fixo.
 type Repeticao struct {
-	// N é a quantidade de clones, no mínimo 1.
-	N int
+	// N é a quantidade de clones declarada, já arredondada para inteiro. É
+	// float64 porque o teto de clones é da resolução: converter para int
+	// antes dela faria um valor que estoura o int64 saturar num extremo
+	// diferente conforme a plataforma, e a mesma entrada seria aceita numa
+	// e recusada noutra.
+	N float64
 	// Eixo é "x" ou "y".
 	Eixo string
 	// Intervalo é o espaçamento entre clones, em porcentagem do eixo do

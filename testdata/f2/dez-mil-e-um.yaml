@@ -1,0 +1,14 @@
+# Um Elemento além do teto de materialização do Frame.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./mil.yaml"
+            box: {x: 0, y: 0, w: 10, h: 100}
+            id: bloco
+            repeat: {n: 10, axis: x, gap: 0}
+          - rect: {x: 0, y: 0, w: 100, h: 100}
+            id: sobra

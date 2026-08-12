@@ -1,0 +1,18 @@
+# Três Instâncias: as duas primeiras são o mesmo Componente escrito de duas
+# formas; a terceira é um homônimo em outra pasta, e tem conteúdo próprio.
+frames:
+  - name: tela
+    w: 300
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./emblema.yaml"
+            box: {x: 0, y: 0, w: 30, h: 100}
+            id: direto
+          - use: "./pecas/../emblema.yaml"
+            box: {x: 35, y: 0, w: 30, h: 100}
+            id: rodeio
+          - use: "./pecas/emblema.yaml"
+            box: {x: 70, y: 0, w: 30, h: 100}
+            id: homonimo

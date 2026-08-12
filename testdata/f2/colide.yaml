@@ -1,0 +1,11 @@
+# As duas regras de segmento colidem: um Elemento com `id: corpo` e um Slot
+# chamado `corpo` no mesmo espaço. O Slot `pe` ainda declara um id, que perde
+# para o nome do Slot.
+elements:
+  - rect: {x: 0, y: 0, w: 10, h: 10}
+    id: corpo
+  - slot: "corpo"
+    box: {x: 20, y: 20, w: 50, h: 50}
+  - slot: "pe"
+    id: outro
+    box: {x: 0, y: 80, w: 100, h: 10}

@@ -1,0 +1,5 @@
+# Mil fatias que juntas cobrem exatamente o espaço local, sem sair dele.
+elements:
+  - rect: {x: 0, y: 0, w: 0.1, h: 100}
+    id: barra
+    repeat: {n: 1000, axis: x, gap: 0}

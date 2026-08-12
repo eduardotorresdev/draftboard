@@ -1,0 +1,5 @@
+# Homônimo do emblema.yaml da raiz, e com conteúdo diferente: a identidade do
+# Componente é o caminho absoluto, não o nome do arquivo.
+elements:
+  - circle: {x: 0, y: 0, d: 100}
+    id: bolha
