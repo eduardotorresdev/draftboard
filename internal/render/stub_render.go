@@ -9,6 +9,9 @@ import (
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 )
 
+// LimiteDeArea é o número máximo de pixels da tela de saída.
+const LimiteDeArea = 64 << 20 // 67 108 864 px (~256 MB de RGBA)
+
 // Canvas é a tela de saída. Todas as coordenadas dos métodos são em pixels do
 // espaço do Frame (antes da escala); o Canvas aplica o fator internamente.
 type Canvas struct{}

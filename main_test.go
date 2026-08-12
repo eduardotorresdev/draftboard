@@ -57,12 +57,29 @@ func numaPastaTemporaria(t *testing.T, fixtures ...string) string {
 	return pasta
 }
 
-// conferaGolden compara o observado com o golden file de mesmo nome.
+// caminhoDosGoldens devolve o caminho absoluto da pasta de goldens, para os
+// testes que rodam numa pasta temporária. Precisa ser chamado antes do Chdir.
+func caminhoDosGoldens(t *testing.T) string {
+	t.Helper()
+	pasta, err := filepath.Abs(filepath.Join("testdata", "f1", "golden"))
+	if err != nil {
+		t.Fatalf("caminho dos goldens: %v", err)
+	}
+	return pasta
+}
+
+// conferaGolden compara o observado com o golden file de mesmo nome, relativo
+// à pasta de fixtures onde o teste está.
 func conferaGolden(t *testing.T, nome, observado string) {
 	t.Helper()
-	caminho := filepath.Join("golden", nome)
+	conferaGoldenEm(t, "golden", nome, observado)
+}
+
+func conferaGoldenEm(t *testing.T, pastaGolden, nome, observado string) {
+	t.Helper()
+	caminho := filepath.Join(pastaGolden, nome)
 	if *atualiza {
-		if err := os.MkdirAll("golden", 0o755); err != nil {
+		if err := os.MkdirAll(pastaGolden, 0o755); err != nil {
 			t.Fatalf("criando golden: %v", err)
 		}
 		if err := os.WriteFile(caminho, []byte(observado), 0o644); err != nil {
@@ -183,6 +200,9 @@ func TestValidateReprovaDocumentoInvalido(t *testing.T) {
 		{"Slot declarado em Documento", "slot-em-documento.yaml", "slot-em-documento.txt"},
 		{"Instância ainda não implementada", "instancia.yaml", "instancia.txt"},
 		{"Repetição ainda não implementada", "repeticao.yaml", "repeticao.txt"},
+		{"dimensão infinita", "nao-finito-infinito.yaml", "nao-finito-infinito.txt"},
+		{"coordenada infinita negativa", "nao-finito-infinito-negativo.yaml", "nao-finito-infinito-negativo.txt"},
+		{"dimensão NaN", "nao-finito-nan.yaml", "nao-finito-nan.txt"},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
@@ -299,6 +319,54 @@ func TestRenderRejeitaOpcaoInvalida(t *testing.T) {
 				t.Errorf("render inválido escreveu em disco: %v", nomes)
 			}
 		})
+	}
+}
+
+// TestRenderRecusaTelaAcimaDoLimiteDeArea fixa o teto de área da CLI: a recusa
+// vem antes de qualquer alocação, com código 1 e mensagem no formato do
+// contrato, em vez de swap, SIGKILL ou pânico do alocador.
+func TestRenderRecusaTelaAcimaDoLimiteDeArea(t *testing.T) {
+	casos := []struct {
+		nome   string
+		args   []string
+		golden string
+	}{
+		{"escala 100", []string{"render", "basico.yaml", "--scale", "100"}, "area-escala-100.txt"},
+		{"escala 10000", []string{"render", "basico.yaml", "--scale", "10000"}, "area-escala-10000.txt"},
+		{"escala 100 com export por Camada", []string{"render", "basico.yaml", "--scale", "100", "--layers"}, "area-escala-100.txt"},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			goldens := caminhoDosGoldens(t)
+			pasta := numaPastaTemporaria(t, "basico.yaml")
+			codigo, stdout, stderr := executa(c.args...)
+			if codigo != 1 {
+				t.Errorf("código de saída = %d, queria 1", codigo)
+			}
+			if stdout != "" {
+				t.Errorf("stdout = %q, queria vazio", stdout)
+			}
+			if nomes := listaDeArquivos(t, pasta); len(nomes) != 1 {
+				t.Errorf("render recusado escreveu imagem: %v", nomes)
+			}
+			conferaGoldenEm(t, goldens, c.golden, stderr)
+		})
+	}
+}
+
+// TestRenderAceitaTelaExatamenteNoLimite fixa que o teto é inclusivo: uma tela
+// de exatamente render.LimiteDeArea pixels ainda renderiza.
+func TestRenderAceitaTelaExatamenteNoLimite(t *testing.T) {
+	pasta := numaPastaTemporaria(t, "teto-exato.yaml")
+	codigo, stdout, stderr := executa("render", "teto-exato.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, stderr)
+	}
+	if stdout != "teto-exato-teto.webp\n" {
+		t.Errorf("stdout = %q, queria %q", stdout, "teto-exato-teto.webp\n")
+	}
+	if nomes := listaDeArquivos(t, pasta); len(nomes) != 2 {
+		t.Errorf("arquivos = %v, queria a fixture mais uma imagem", nomes)
 	}
 }
 

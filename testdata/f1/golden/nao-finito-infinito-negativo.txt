@@ -1,0 +1,1 @@
+erro: nao-finito-infinito-negativo.yaml: frames[0].layers[0].elements[0].rect: campo "x" espera número finito, encontrou "-.inf"

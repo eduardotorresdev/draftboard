@@ -464,6 +464,11 @@ func (l *leitor) numero(m *mapaLido, campo string) (float64, error) {
 	if err := n.Decode(&v); err != nil {
 		return 0, l.erro(m.local, "campo %q espera número, encontrou %q", campo, n.Value)
 	}
+	// Infinito e NaN atravessariam a conversão para pixels como geometria
+	// absurda: saturam o inteiro e escapam das comparações de área zero.
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, l.erro(m.local, "campo %q espera número finito, encontrou %q", campo, n.Value)
+	}
 	return v, nil
 }
 

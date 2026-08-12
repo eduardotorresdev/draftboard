@@ -1,0 +1,1 @@
+erro: nao-finito-nan.yaml: frames[0].layers[0].elements[0].rect: campo "y" espera número finito, encontrou ".nan"

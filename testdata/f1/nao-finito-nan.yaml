@@ -1,0 +1,8 @@
+frames:
+  - name: home
+    w: 1280
+    h: 800
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: .nan, w: .nan, h: 10}

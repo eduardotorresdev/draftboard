@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/eduardotorresdev/draftboard/internal/inspect"
@@ -34,8 +35,8 @@ func comandoRender(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "erro: não foi possível criar o diretório de saída %q\n", o.saida)
 		return 1
 	}
-	for _, f := range doc.Frames {
-		caminhos, err := escreveFrame(o, doc.Nome, f)
+	for i, f := range doc.Frames {
+		caminhos, err := escreveFrame(o, doc.Nome, i, f)
 		for _, c := range caminhos {
 			fmt.Fprintln(stdout, c)
 		}
@@ -47,11 +48,14 @@ func comandoRender(args []string, stdout, stderr io.Writer) int {
 }
 
 // escreveFrame gera as imagens de um Frame e devolve os caminhos escritos.
-func escreveFrame(o opcoes, documento string, f scene.Frame) ([]string, error) {
+func escreveFrame(o opcoes, documento string, indice int, f scene.Frame) ([]string, error) {
 	var caminhos []string
 	// As Notas não aparecem no export por Camada, então ele também não
 	// reserva Chrome ao redor do Frame.
 	if o.camadas {
+		if err := cabeNaTela(o, indice, f, 0, 0, 0, 0); err != nil {
+			return nil, err
+		}
 		for i, c := range f.Camadas {
 			tela := render.DesenhaFrame(f, o.escala, 0, 0, 0, 0, i)
 			nome := fmt.Sprintf("%s-%s-%02d-%s.webp", slug(documento), slug(f.Nome), i+1, slug(c.Nome))
@@ -63,8 +67,13 @@ func escreveFrame(o opcoes, documento string, f scene.Frame) ([]string, error) {
 		}
 		return caminhos, nil
 	}
+	// O Chrome entra na conta do teto de área, então o teste vem depois de
+	// planejar as Notas, com as margens que serão realmente usadas.
 	plano := notes.Planeja(f, o.notas, o.escala)
 	t, d, b, e := plano.Margens()
+	if err := cabeNaTela(o, indice, f, t, d, b, e); err != nil {
+		return nil, err
+	}
 	tela := render.DesenhaFrame(f, o.escala, t, d, b, e, -1)
 	plano.Desenha(tela)
 	nome := fmt.Sprintf("%s-%s.webp", slug(documento), slug(f.Nome))
@@ -73,6 +82,25 @@ func escreveFrame(o opcoes, documento string, f scene.Frame) ([]string, error) {
 		return caminhos, err
 	}
 	return append(caminhos, caminho), nil
+}
+
+// cabeNaTela recusa, antes de qualquer alocação, o Frame cuja tela de saída
+// passaria de render.LimiteDeArea. A área é a do Frame mais o Chrome, com o
+// fator de escala aplicado nos dois eixos.
+func cabeNaTela(o opcoes, indice int, f scene.Frame, margemT, margemD, margemB, margemE float64) error {
+	largura := margemE + float64(f.L) + margemD
+	altura := margemT + float64(f.A) + margemB
+	area := largura * altura * o.escala * o.escala
+	if area <= render.LimiteDeArea {
+		return nil
+	}
+	return &scene.Erro{
+		Arquivo: o.arquivo,
+		Local:   fmt.Sprintf("frames[%d]", indice),
+		Msg: fmt.Sprintf(
+			"a tela de saída teria %.0f px com --scale %s, acima do limite de %d px; reduza a escala ou as dimensões do Frame",
+			area, strconv.FormatFloat(o.escala, 'f', -1, 64), render.LimiteDeArea),
+	}
 }
 
 func escreveWebP(caminho string, tela *render.Canvas) error {
