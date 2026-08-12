@@ -51,7 +51,16 @@ func (c *Canvas) Texto(x, y float64, s string, tamanho float64, t scene.Tom) {
 func (c *Canvas) MedeTexto(s string, tamanho float64) (l, a float64) {
 	f := c.face(tamanho)
 	_, altura := metricas(f)
-	return c.larguraDeDispositivo(f, s) / c.escala, altura / c.escala
+	return c.paraOFrame(c.larguraDeDispositivo(f, s)), c.paraOFrame(altura)
+}
+
+// paraOFrame converte px de dispositivo de volta ao espaço do Frame. Escala
+// não utilizável devolve 0 em vez de infinito.
+func (c *Canvas) paraOFrame(v float64) float64 {
+	if !finito(c.escala) || c.escala <= 0 {
+		return 0
+	}
+	return v / c.escala
 }
 
 // QuebraTexto quebra o texto em linhas que cabem em larguraMax, quebrando
@@ -90,9 +99,10 @@ func (c *Canvas) QuebraTexto(s string, tamanho, larguraMax float64) []string {
 // face devolve a fonte no tamanho pedido, convertido para px de dispositivo.
 func (c *Canvas) face(tamanho float64) font.Face {
 	td := tamanho * c.escala
-	if td <= 0 {
-		// Tamanho não-positivo não tem desenho possível; usamos o menor
-		// tamanho legível em vez de deixar a fonte inválida.
+	if !finito(td) || td <= 0 {
+		// Tamanho não-positivo, NaN ou infinito não tem desenho possível.
+		// Normalizamos para 1 — se não, a chave nunca acerta a memória (NaN
+		// não é igual a si mesmo) e o mapa cresceria sem limite.
 		td = 1
 	}
 	if f, ok := c.faces[td]; ok {

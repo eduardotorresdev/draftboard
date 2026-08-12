@@ -112,8 +112,14 @@ func comparaGolden(t *testing.T, nome string, got []byte) {
 		t.Fatalf("lendo golden (rode com -update para gerar): %v", err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Errorf("bytes diferem do golden %s: %d bytes gerados, %d no golden",
-			nome, len(got), len(want))
+		gerado := filepath.Join(t.TempDir(), nome)
+		if err := os.WriteFile(gerado, got, 0o644); err != nil {
+			t.Fatalf("gravando o gerado para diagnóstico: %v", err)
+		}
+		t.Errorf("bytes diferem do golden %s: %d bytes gerados, %d no golden\n"+
+			"gerado em %s\ngolden  em %s\n"+
+			"compare com: open %s %s\nse a mudança for esperada, rode: go test ./internal/render -update",
+			nome, len(got), len(want), gerado, caminho, gerado, caminho)
 	}
 }
 
@@ -193,7 +199,8 @@ func TestEscalaProduzDimensoesProporcionais(t *testing.T) {
 		{1.5, 300, 180, "meio"},
 		{2.5, 500, 300, "dois e meio"},
 		{0.5, 100, 60, "reducao"},
-		{1.337, 267, 160, "arbitrario"}, // 267.4 -> 267 ; 160.44 -> 160
+		{1.337, 267, 160, "arbitrario"},          // 267.4 -> 267 ; 160.44 -> 160
+		{1.333, 267, 160, "arredonda para cima"}, // 266.6 -> 267 ; 159.96 -> 160
 	}
 	for _, caso := range casos {
 		t.Run(caso.nomeDoCaso, func(t *testing.T) {

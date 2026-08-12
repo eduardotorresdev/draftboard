@@ -13,6 +13,7 @@ package render
 import (
 	"image"
 	"image/color"
+	"image/draw"
 	"io"
 	"math"
 
@@ -22,6 +23,9 @@ import (
 
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 )
+
+// LimiteDeArea é o número máximo de pixels da tela de saída.
+const LimiteDeArea = 64 << 20 // 67 108 864 px (~256 MB de RGBA)
 
 const (
 	// raioBase é o raio dos cantos arredondados de um Retângulo, em pixels do
@@ -40,6 +44,10 @@ const (
 
 // Canvas é a tela de saída. Todas as coordenadas dos métodos são em pixels do
 // espaço do Frame (antes da escala); o Canvas aplica o fator internamente.
+//
+// Um Canvas NÃO é seguro para uso concorrente: use um Canvas por goroutine.
+// Os métodos mutam o contexto de desenho e a memória de fontes sem qualquer
+// sincronização.
 type Canvas struct {
 	dc     *gg.Context
 	escala float64
@@ -53,7 +61,7 @@ type Canvas struct {
 	// reaproveitada por todo DesenhaElemento.
 	recorte *image.Alpha
 
-	// faces memoriza as fontes já construídas, indexadas pelo tamanho em px de
+	// faces memoiza as fontes já construídas, indexadas pelo tamanho em px de
 	// dispositivo, para que o mesmo tamanho não seja reconstruído a cada linha.
 	faces map[float64]font.Face
 }
@@ -64,18 +72,18 @@ type Canvas struct {
 //
 // As dimensões finais em pixels são o produto arredondado para o inteiro mais
 // próximo, de modo que fatores de escala não-inteiros funcionem.
+//
+// A tela satura em LimiteDeArea pixels: pedida uma área maior, a escala efetiva
+// é reduzida até caber, preservando a proporção, em vez de alocar sem teto. A
+// CLI recusa esse caso antes de chegar aqui (ver CONTRACT.md §5b); a saturação
+// existe para que a biblioteca jamais entre em pânico nem vá para o swap.
 func NewCanvas(l, a int, margemT, margemD, margemB, margemE, escala float64) *Canvas {
 	fl, fa := float64(l), float64(a)
+	larguraTotal := margemE + fl + margemD
+	alturaTotal := margemT + fa + margemB
 
-	telaL := arredonda((margemE + fl + margemD) * escala)
-	telaA := arredonda((margemT + fa + margemB) * escala)
-	// Uma tela sem pixel nenhum não é codificável; garantimos ao menos 1x1.
-	if telaL < 1 {
-		telaL = 1
-	}
-	if telaA < 1 {
-		telaA = 1
-	}
+	escala = escalaQueCabeNoTeto(larguraTotal, alturaTotal, escala)
+	telaL, telaA := dimensoesDaTela(larguraTotal, alturaTotal, escala)
 
 	c := &Canvas{
 		dc:      gg.NewContext(telaL, telaA),
@@ -106,7 +114,14 @@ func NewCanvas(l, a int, margemT, margemD, margemB, margemE, escala float64) *Ca
 // é sólido, no Tom que já traz consigo, e é posicionado no espaço do Frame —
 // portanto deslocado pelas margens esquerda e superior. Um Elemento que
 // ultrapassa a borda é cortado e nunca invade o Chrome.
+//
+// A bounding box é recortada ao retângulo do Frame ANTES de rasterizar. Além de
+// evitar trabalho invisível, isso é o que impede o laço de CPU sem fim do
+// rasterizador quando a extensão do Elemento passa de 2^25 px de dispositivo.
 func (c *Canvas) DesenhaElemento(e scene.Elemento) {
+	if !finito(e.X) || !finito(e.Y) || !finito(e.L) || !finito(e.A) {
+		return
+	}
 	if e.L <= 0 || e.A <= 0 {
 		// Elemento de área zero não pinta nada.
 		return
@@ -117,27 +132,149 @@ func (c *Canvas) DesenhaElemento(e scene.Elemento) {
 	l := e.L * c.escala
 	a := e.A * c.escala
 
+	fx0, fy0, fx1, fy1 := c.retanguloDoFrame()
+	// Elemento inteiramente fora do Frame: a máscara não deixaria passar nada.
+	if x >= fx1 || y >= fy1 || x+l <= fx0 || y+a <= fy0 {
+		return
+	}
+
 	// A máscara tem sempre o tamanho da tela, então SetMask não pode falhar.
 	_ = c.dc.SetMask(c.mascaraDoFrame())
 	c.dc.SetColor(cor(e.Tom))
 
-	switch e.Forma {
-	case scene.Circulo:
-		// O Círculo é definido por um único diâmetro e a resolução garante
-		// L == A. Tomamos o menor dos dois lados para que ele continue redondo
-		// mesmo num Frame não-quadrado, jamais virando elipse.
-		d := math.Min(l, a)
-		c.dc.DrawCircle(x+l/2, y+a/2, d/2)
-	default:
-		if e.Arredondado {
-			c.dc.DrawRoundedRectangle(x, y, l, a, c.raio(e))
-		} else {
-			c.dc.DrawRectangle(x, y, l, a)
-		}
+	if e.Forma == scene.Circulo {
+		c.tracaCirculo(x, y, l, a, fx0, fy0, fx1, fy1)
+	} else {
+		c.tracaRetangulo(e, x, y, l, a, fx0, fy0, fx1, fy1)
 	}
 
 	c.dc.Fill()
 	c.dc.ResetClip()
+}
+
+// tracaRetangulo traça o Retângulo já recortado ao Frame. O recorte é exato:
+// um Retângulo cortado continua um Retângulo. No caso arredondado a caixa é
+// folgada pelo raio, de modo que os cantos criados pelo corte caem fora do
+// Frame e nunca chegam a aparecer.
+func (c *Canvas) tracaRetangulo(e scene.Elemento, x, y, l, a, fx0, fy0, fx1, fy1 float64) {
+	r, folga := 0.0, 0.0
+	if e.Arredondado {
+		r = c.raio(e)
+		folga = r + 1
+	}
+
+	x0, y0 := math.Max(x, fx0-folga), math.Max(y, fy0-folga)
+	x1, y1 := math.Min(x+l, fx1+folga), math.Min(y+a, fy1+folga)
+
+	// A caixa recortada precisa continuar comportando o raio nos cantos que
+	// sobreviveram ao corte. Crescemos para o lado que foi cortado, que por
+	// construção está fora do Frame e portanto é invisível.
+	if r > 0 {
+		if x1-x0 < 2*r {
+			if x0 > x {
+				x0 = x1 - 2*r
+			} else {
+				x1 = x0 + 2*r
+			}
+		}
+		if y1-y0 < 2*r {
+			if y0 > y {
+				y0 = y1 - 2*r
+			} else {
+				y1 = y0 + 2*r
+			}
+		}
+		c.dc.DrawRoundedRectangle(x0, y0, x1-x0, y1-y0, r)
+		return
+	}
+	c.dc.DrawRectangle(x0, y0, x1-x0, y1-y0)
+}
+
+// tracaCirculo traça o Círculo. O Círculo é definido por um único diâmetro e a
+// resolução garante L == A; tomamos o menor dos dois lados para que ele
+// continue redondo mesmo num Frame não-quadrado, jamais virando elipse.
+func (c *Canvas) tracaCirculo(x, y, l, a, fx0, fy0, fx1, fy1 float64) {
+	cx, cy := x+l/2, y+a/2
+	r := math.Min(l, a) / 2
+
+	// O rasterizador percorre a extensão inteira do caminho, linha a linha, e o
+	// ponto fixo do freetype ainda satura em 2^25 px. Um Círculo muito maior que
+	// a tela é traçado como polígono limitado à faixa do Frame: o desenho onde
+	// ele aparece é o mesmo, e o custo passa a ser proporcional ao Frame em vez
+	// de ao diâmetro.
+	if r > c.limiteDeTracado() {
+		c.tracaCirculoGigante(cx, cy, r, fx0, fy0, fx1, fy1)
+		return
+	}
+	c.dc.DrawCircle(cx, cy, r)
+}
+
+// limiteDeTracado é a maior extensão que vale a pena entregar ao rasterizador:
+// além disso o caminho é muito maior que a tela e só gera trabalho invisível.
+func (c *Canvas) limiteDeTracado() float64 {
+	maior := c.dc.Width()
+	if c.dc.Height() > maior {
+		maior = c.dc.Height()
+	}
+	return 4 * float64(maior)
+}
+
+// tracaCirculoGigante aproxima um Círculo enorme por um polígono restrito à
+// faixa de linhas do Frame. A borda é amostrada a cada linha da tela e os
+// pontos são presos às bordas do Frame, então dentro do Frame o resultado é
+// indistinguível do Círculo real — a flecha de cada segmento de uma linha de
+// altura é 1/(8r) de pixel.
+func (c *Canvas) tracaCirculoGigante(cx, cy, r, fx0, fy0, fx1, fy1 float64) {
+	topo := math.Max(fy0-1, cy-r)
+	base := math.Min(fy1+1, cy+r)
+	if topo > base {
+		return
+	}
+	esqLim, dirLim := fx0-1, fx1+1
+
+	n := int(math.Ceil(base-topo)) + 1
+	if n < 2 {
+		n = 2
+	}
+
+	direita := make([][2]float64, n)
+	esquerda := make([][2]float64, n)
+	for i := 0; i < n; i++ {
+		y := topo + (base-topo)*float64(i)/float64(n-1)
+		dy := y - cy
+		meia := 0.0
+		if s := r*r - dy*dy; s > 0 {
+			meia = math.Sqrt(s)
+		}
+		direita[i] = [2]float64{preso(cx+meia, esqLim, dirLim), y}
+		esquerda[i] = [2]float64{preso(cx-meia, esqLim, dirLim), y}
+	}
+
+	c.dc.MoveTo(esquerda[0][0], esquerda[0][1])
+	for _, p := range direita {
+		c.dc.LineTo(p[0], p[1])
+	}
+	for i := len(esquerda) - 1; i >= 0; i-- {
+		c.dc.LineTo(esquerda[i][0], esquerda[i][1])
+	}
+	c.dc.ClosePath()
+}
+
+// preso limita v ao intervalo [min, max].
+func preso(v, min, max float64) float64 {
+	if !finito(v) {
+		if math.IsInf(v, -1) {
+			return min
+		}
+		return max
+	}
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
 
 // Retangulo pinta um retângulo sólido no plano de anotação. As coordenadas são
@@ -220,17 +357,49 @@ func (c *Canvas) retanguloDoFrame() (x0, y0, x1, y1 float64) {
 }
 
 // mascaraDoFrame devolve a máscara de recorte do Frame, construindo-a na
-// primeira chamada.
+// primeira chamada. O recorte é um retângulo alinhado aos eixos, então basta
+// preencher o alfa direto: não há caminho a rasterizar, e a fronteira sai dura
+// mesmo quando as margens caem em fração de pixel.
 func (c *Canvas) mascaraDoFrame() *image.Alpha {
 	if c.recorte == nil {
-		m := gg.NewContext(c.dc.Width(), c.dc.Height())
+		m := image.NewAlpha(image.Rect(0, 0, c.dc.Width(), c.dc.Height()))
 		x0, y0, x1, y1 := c.retanguloDoFrame()
-		m.SetColor(color.Opaque)
-		m.DrawRectangle(x0, y0, x1-x0, y1-y0)
-		m.Fill()
-		c.recorte = m.AsMask()
+		r := image.Rect(arredonda(x0), arredonda(y0), arredonda(x1), arredonda(y1))
+		draw.Draw(m, r.Intersect(m.Bounds()), image.NewUniform(color.Alpha{A: 0xFF}), image.Point{}, draw.Src)
+		c.recorte = m
 	}
 	return c.recorte
+}
+
+// escalaQueCabeNoTeto reduz a escala até que a tela caiba em LimiteDeArea,
+// preservando a proporção. Escala que já cabe volta intacta.
+func escalaQueCabeNoTeto(largura, altura, escala float64) float64 {
+	if !finito(escala) || escala <= 0 || largura <= 0 || altura <= 0 {
+		return escala
+	}
+	maxEscala := math.Sqrt(LimiteDeArea / (largura * altura))
+	if escala > maxEscala {
+		return maxEscala
+	}
+	return escala
+}
+
+// dimensoesDaTela converte as medidas do espaço do Frame em pixels da tela.
+// O produto é arredondado para o inteiro mais próximo; se o arredondamento
+// estourar o teto de área, cai para o inteiro abaixo.
+func dimensoesDaTela(largura, altura, escala float64) (l, a int) {
+	l, a = arredonda(largura*escala), arredonda(altura*escala)
+	if l >= 1 && a >= 1 && l > LimiteDeArea/a {
+		l, a = int(math.Floor(largura*escala)), int(math.Floor(altura*escala))
+	}
+	// Uma tela sem pixel nenhum não é codificável; garantimos ao menos 1x1.
+	if l < 1 {
+		l = 1
+	}
+	if a < 1 {
+		a = 1
+	}
+	return l, a
 }
 
 // cor devolve o cinza opaco de um Tom. A imagem inteira é escala de cinza: os
@@ -243,7 +412,18 @@ func cor(t scene.Tom) color.Color {
 // arredonda converte px de dispositivo fracionários no inteiro mais próximo.
 // É a regra única de arredondamento de toda a rasterização.
 func arredonda(v float64) int {
+	if v > LimiteDeArea {
+		return LimiteDeArea
+	}
+	if v < 0 {
+		return 0
+	}
 	return int(math.Round(v))
+}
+
+// finito diz se o valor é um número utilizável como coordenada.
+func finito(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
 }
 
 // escritor guarda o primeiro erro de escrita, já que o codificador WebP não os
