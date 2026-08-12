@@ -9,7 +9,8 @@ Vocabulário obrigatório: o de `CONTEXT.md`, em código, mensagens de erro e sk
 
 `go.mod` e `go.sum` **já estão prontos e são congelados**. Não rode `go mod tidy`,
 não adicione dependência. Deps disponíveis: `gopkg.in/yaml.v3`, `github.com/fogleman/gg`,
-`github.com/HugoSmits86/nativewebp`, `golang.org/x/image` (inclui `font/gofont/goregular`).
+`github.com/HugoSmits86/nativewebp`, `golang.org/x/image v0.24.0` (inclui
+`font/gofont/goregular`) e `github.com/golang/freetype` (carregador de fonte).
 
 Dono de cada diretório (ninguém escreve fora do seu):
 
