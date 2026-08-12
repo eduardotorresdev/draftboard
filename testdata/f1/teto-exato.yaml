@@ -1,9 +1,0 @@
-# 8192 x 8192 = 67 108 864 px: exatamente render.LimiteDeArea, ainda aceito.
-frames:
-  - name: teto
-    w: 8192
-    h: 8192
-    layers:
-      - name: base
-        elements:
-          - rect: {x: 0, y: 0, w: 100, h: 100}
