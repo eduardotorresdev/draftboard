@@ -1,0 +1,3 @@
+elements:
+  - use: "./ciclo-a.yaml"
+    box: {x: 5, y: 5, w: 90, h: 90}

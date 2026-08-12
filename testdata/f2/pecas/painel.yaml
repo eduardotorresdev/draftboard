@@ -1,0 +1,8 @@
+# Componente que instancia outro Componente da mesma pasta: o caminho é
+# relativo a este arquivo, não ao diretório de trabalho.
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 100}
+    id: fundo
+  - use: "./selo.yaml"
+    box: {x: 20, y: 20, w: 60, h: 60}
+    id: selo

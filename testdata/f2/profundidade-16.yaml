@@ -1,0 +1,11 @@
+# Cadeia de exatamente 16 níveis de Componente: n02 até n17. É o limite, e
+# resolve.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./profundidade/n02.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

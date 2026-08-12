@@ -1,0 +1,5 @@
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 100}
+    id: borda
+  - slot: "miolo"
+    box: {x: 10, y: 10, w: 80, h: 80}

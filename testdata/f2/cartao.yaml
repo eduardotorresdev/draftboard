@@ -1,0 +1,9 @@
+# Componente: espaço local de 0 a 100 nos dois eixos, sem Frames.
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 100}
+    id: fundo
+  - circle: {x: 10, y: 10, d: 20}
+    id: avatar
+  - rect: {x: 40, y: 20, w: 50, h: 30}
+    id: texto
+    note: "Título do cartão"

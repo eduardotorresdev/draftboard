@@ -1,0 +1,18 @@
+documento repeticao
+  frame tela 200x200
+    camada base
+      item#0 retangulo 0,0 20x20 tom=300 elev=1
+      item#1 retangulo 0,24 20x20 tom=300 elev=1
+      item#2 retangulo 0,48 20x20 tom=300 elev=1
+      e1#0 circulo 40,100 20x20 tom=300 elev=1
+      e1#1 circulo 70,100 20x20 tom=300 elev=1
+      cartela#0/faixa retangulo 0,140 40x40 tom=300 elev=1 de=emblema.yaml
+      cartela#0/ponto circulo 1,144 2x2 tom=500 elev=2 de=emblema.yaml
+      cartela#1/faixa retangulo 50,140 40x40 tom=300 elev=1 de=emblema.yaml
+      cartela#1/ponto circulo 51,144 2x2 tom=500 elev=2 de=emblema.yaml
+      cartela#2/faixa retangulo 100,140 40x40 tom=300 elev=1 de=emblema.yaml
+      cartela#2/ponto circulo 101,144 2x2 tom=500 elev=2 de=emblema.yaml
+      coluna#0/faixa retangulo 120,0 60x30 tom=300 elev=1 de=emblema.yaml
+      coluna#0/ponto circulo 121,3 4x4 tom=500 elev=2 de=emblema.yaml
+      coluna#1/faixa retangulo 120,40 60x30 tom=300 elev=1 de=emblema.yaml
+      coluna#1/ponto circulo 121,43 4x4 tom=500 elev=2 de=emblema.yaml

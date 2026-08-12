@@ -1,0 +1,30 @@
+frames:
+  - name: tela
+    w: 400
+    h: 400
+    layers:
+      - name: base
+        elements:
+          - use: "./layout.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}
+            id: pagina
+            slots:
+              # Slot preenchido por um Componente.
+              cabeca: {use: "./emblema.yaml"}
+              # Slot preenchido por Elementos inline. A região do Slot é um
+              # novo espaço de 0 a 100: `direita` ocupa a metade direita da
+              # região, não a metade direita do Componente.
+              corpo:
+                elements:
+                  - rect: {x: 50, y: 0, w: 50, h: 100}
+                    id: direita
+      - name: extra
+        elements:
+          # O Componente que declara o Slot mora em pecas/, mas o
+          # preenchimento é escrito aqui: "./emblema.yaml" resolve contra este
+          # Documento, não contra a pasta do Componente.
+          - use: "./pecas/caixilho.yaml"
+            box: {x: 10, y: 10, w: 30, h: 30}
+            id: caixilho
+            slots:
+              miolo: {use: "./emblema.yaml"}

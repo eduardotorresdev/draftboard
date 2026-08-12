@@ -1,0 +1,1 @@
+erro: usa-documento.yaml: frames[0].layers[0].elements[0] -> ./reescala.yaml: esperava um Componente, mas o arquivo declara `frames`; um Documento não pode ser instanciado

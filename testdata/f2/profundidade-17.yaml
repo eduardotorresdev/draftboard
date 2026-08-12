@@ -1,0 +1,10 @@
+# Cadeia de 17 níveis de Componente: n01 até n17. Passa do limite, e é erro.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./profundidade/n01.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

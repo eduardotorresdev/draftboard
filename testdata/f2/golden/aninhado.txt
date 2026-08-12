@@ -1,0 +1,6 @@
+documento aninhado
+  frame tela 200x200
+    camada base
+      moldura retangulo 10,10 180x180 tom=300 elev=1
+      painel/fundo retangulo 20,20 120x80 tom=500 elev=2 de=pecas/painel.yaml
+      painel/selo/marca circulo 51,41 58x58 tom=700 elev=3 de=pecas/selo.yaml

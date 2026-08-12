@@ -1,0 +1,25 @@
+frames:
+  - name: tela
+    w: 200
+    h: 200
+    layers:
+      - name: base
+        elements:
+          # Passo = tamanho + intervalo: 10 + 2 no eixo y.
+          - rect: {x: 0, y: 0, w: 10, h: 10}
+            id: item
+            repeat: {n: 3, axis: y, gap: 2}
+          # Passo = diâmetro + intervalo: 10 + 5 no eixo x.
+          - circle: {x: 20, y: 50, d: 10}
+            repeat: {n: 2, axis: x, gap: 5}
+          # Passo = box.w + intervalo: 20 + 5 no eixo x.
+          - use: "./emblema.yaml"
+            box: {x: 0, y: 70, w: 20, h: 20}
+            id: cartela
+            repeat: {n: 3, axis: x, gap: 5}
+          # Passo = box.h + intervalo: 15 + 5 no eixo y. A caixa não é
+          # quadrada: o eixo da Repetição escolhe qual lado entra no passo.
+          - use: "./emblema.yaml"
+            box: {x: 60, y: 0, w: 30, h: 15}
+            id: coluna
+            repeat: {n: 2, axis: y, gap: 5}

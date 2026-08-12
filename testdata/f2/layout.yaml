@@ -1,0 +1,16 @@
+# Componente que é layout: declara Slots para receber conteúdo de quem o
+# instancia. `rodape` tem conteúdo padrão; `livre` não tem nada.
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 100}
+    id: moldura
+  - slot: "cabeca"
+    box: {x: 5, y: 5, w: 90, h: 20}
+  - slot: "corpo"
+    box: {x: 5, y: 30, w: 90, h: 30}
+  - slot: "rodape"
+    box: {x: 5, y: 65, w: 90, h: 15}
+    default:
+      - rect: {x: 0, y: 0, w: 100, h: 100}
+        id: padrao
+  - slot: "livre"
+    box: {x: 5, y: 85, w: 90, h: 10}

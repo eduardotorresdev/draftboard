@@ -1,0 +1,1 @@
+erro: ciclo.yaml: frames[0].layers[0].elements[0] -> ./ciclo-a.yaml: elements[0] -> ./ciclo-b.yaml: elements[0]: ciclo de referência entre Componentes: "./ciclo-a.yaml" já está sendo expandido nesta cadeia de Instâncias

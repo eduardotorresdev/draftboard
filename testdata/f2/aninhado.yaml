@@ -1,0 +1,14 @@
+frames:
+  - name: tela
+    w: 200
+    h: 200
+    layers:
+      - name: base
+        # `moldura` é do Documento e contém o Componente inteiro: a Elevação
+        # atravessa a fronteira do Componente e conta a partir dela.
+        elements:
+          - rect: {x: 5, y: 5, w: 90, h: 90}
+            id: moldura
+          - use: "./pecas/painel.yaml"
+            box: {x: 10, y: 10, w: 60, h: 40}
+            id: painel

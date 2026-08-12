@@ -1,0 +1,13 @@
+documento slots
+  frame tela 400x400
+    camada base
+      pagina/moldura retangulo 0,0 400x400 tom=300 elev=1 de=layout.yaml
+      pagina/cabeca/faixa retangulo 20,20 360x80 tom=500 elev=2 de=emblema.yaml
+      pagina/cabeca/ponto circulo 27,28 22x22 tom=700 elev=3 de=emblema.yaml
+      pagina/corpo/direita retangulo 200,120 180x120 tom=500 elev=2
+      pagina/rodape/padrao retangulo 20,260 360x60 tom=500 elev=2 de=layout.yaml
+      pagina/livre retangulo 20,340 360x40 tom=500 elev=2 de=layout.yaml
+    camada extra
+      caixilho/borda retangulo 40,40 120x120 tom=300 elev=5 de=pecas/caixilho.yaml
+      caixilho/miolo/faixa retangulo 52,52 96x96 tom=100 elev=6 de=emblema.yaml
+      caixilho/miolo/ponto circulo 54,62 6x6 tom=300 elev=7 de=emblema.yaml

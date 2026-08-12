@@ -1,0 +1,1 @@
+erro: cartao.yaml: esperava um Documento, mas o arquivo não declara `frames`; Componente só pode ser usado por uma Instância

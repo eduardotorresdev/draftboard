@@ -15,7 +15,7 @@ import (
 )
 
 // atualiza regrava os golden files a partir da saída observada.
-var atualiza = flag.Bool("atualiza", false, "regrava os golden files de testdata/f1")
+var atualiza = flag.Bool("atualiza", false, "regrava os golden files de testdata")
 
 // TestMain garante que nenhum teste deixe imagem no diretório do pacote: todo
 // caso que invoca `render` tem de escrever numa pasta descartável.
@@ -201,6 +201,9 @@ func TestValidateNaoImprimeNadaEmSucesso(t *testing.T) {
 
 // TestValidateReprovaDocumentoInvalido cobre cada regra de erro do contrato
 // pela mensagem exata que o usuário vê e pelo código de saída 1.
+//
+// As Instâncias e Repetições que F1 recusava com "ainda não implementada" agora
+// resolvem: a cobertura delas está em f2_test.go, junto do resto do reuso.
 func TestValidateReprovaDocumentoInvalido(t *testing.T) {
 	casos := []struct{ nome, fixture, golden string }{
 		{"campo desconhecido sugere a chave próxima", "campo-desconhecido.yaml", "campo-desconhecido.txt"},
@@ -213,8 +216,6 @@ func TestValidateReprovaDocumentoInvalido(t *testing.T) {
 		{"eixo da Repetição fora de x e y", "repeticao-eixo.yaml", "repeticao-eixo.txt"},
 		{"Instância sem box", "instancia-sem-box.yaml", "instancia-sem-box.txt"},
 		{"Slot declarado em Documento", "slot-em-documento.yaml", "slot-em-documento.txt"},
-		{"Instância ainda não implementada", "instancia.yaml", "instancia.txt"},
-		{"Repetição ainda não implementada", "repeticao.yaml", "repeticao.txt"},
 		{"dimensão infinita", "nao-finito-infinito.yaml", "nao-finito-infinito.txt"},
 		{"coordenada infinita negativa", "nao-finito-infinito-negativo.yaml", "nao-finito-infinito-negativo.txt"},
 		{"dimensão NaN", "nao-finito-nan.yaml", "nao-finito-nan.txt"},

@@ -1,0 +1,1 @@
+erro: inexistente.yaml: frames[0].layers[0].elements[0]: Componente não encontrado: "./nao-existe.yaml"

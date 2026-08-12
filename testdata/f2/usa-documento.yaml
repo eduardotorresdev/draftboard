@@ -1,0 +1,9 @@
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./reescala.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

@@ -1,0 +1,3 @@
+elements:
+  - use: "./n08.yaml"
+    box: {x: 0, y: 0, w: 100, h: 100}

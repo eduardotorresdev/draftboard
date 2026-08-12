@@ -1,0 +1,5 @@
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 100}
+    id: faixa
+  - circle: {x: 2, y: 10, d: 6}
+    id: ponto

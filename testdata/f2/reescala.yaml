@@ -1,0 +1,12 @@
+frames:
+  - name: tela
+    w: 400
+    h: 200
+    layers:
+      - name: base
+        elements:
+          # Caixa de proporção diferente do quadrado local: 320x100 px, com
+          # deslocamento em 40,40.
+          - use: "./cartao.yaml"
+            box: {x: 10, y: 20, w: 80, h: 50}
+            id: cartao

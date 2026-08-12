@@ -29,12 +29,42 @@ var (
 	discriminantes = []string{"rect", "circle", "use", "slot"}
 )
 
-// Arquivo lê e decodifica o arquivo YAML no caminho dado. O tipo do arquivo é
-// inferido pelo conteúdo: declarar `frames` faz dele um Documento, senão é um
-// Componente. Exatamente um dos dois valores devolvidos é não-nulo.
+// LeDocumento lê e decodifica o arquivo YAML no caminho dado como Documento. O
+// tipo do arquivo é inferido pelo conteúdo: declarar `frames` faz dele um
+// Documento. Um arquivo sem `frames` é um Componente, e é recusado aqui.
 //
 // O erro devolvido é sempre do tipo *scene.Erro.
-func Arquivo(caminho string) (*Documento, *Componente, error) {
+func LeDocumento(caminho string) (*Documento, error) {
+	l, raiz, err := abre(caminho)
+	if err != nil {
+		return nil, err
+	}
+	if !temChave(raiz, "frames") {
+		return nil, l.erro("", "esperava um Documento, mas o arquivo não declara `frames`; Componente só pode ser usado por uma Instância")
+	}
+	l.emDocumento = true
+	return l.documento(raiz, caminho)
+}
+
+// LeComponente lê e decodifica o arquivo YAML no caminho dado como Componente:
+// um arquivo sem `frames`, escrito num espaço de coordenadas próprio de 0 a
+// 100. Um arquivo com `frames` é um Documento, e é recusado aqui.
+//
+// O erro devolvido é sempre do tipo *scene.Erro.
+func LeComponente(caminho string) (*Componente, error) {
+	l, raiz, err := abre(caminho)
+	if err != nil {
+		return nil, err
+	}
+	if temChave(raiz, "frames") {
+		return nil, l.erro("", "esperava um Componente, mas o arquivo declara `frames`; um Documento não pode ser instanciado")
+	}
+	return l.componente(raiz, caminho)
+}
+
+// abre lê o arquivo, decodifica o YAML e devolve o leitor já preparado junto do
+// nó de mapa no topo do arquivo.
+func abre(caminho string) (*leitor, *yaml.Node, error) {
 	dados, err := os.ReadFile(caminho)
 	if err != nil {
 		msg := "não foi possível ler o arquivo"
@@ -59,14 +89,7 @@ func Arquivo(caminho string) (*Documento, *Componente, error) {
 	if raiz.Kind != yaml.MappingNode {
 		return nil, nil, l.erro("", "esperava um mapa no topo do arquivo, encontrou %s", nomeDoTipo(raiz))
 	}
-
-	if temChave(raiz, "frames") {
-		l.emDocumento = true
-		d, err := l.documento(raiz, caminho)
-		return d, nil, err
-	}
-	c, err := l.componente(raiz, caminho)
-	return nil, c, err
+	return l, raiz, nil
 }
 
 // leitor carrega o estado comum da decodificação de um arquivo.

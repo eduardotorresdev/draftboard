@@ -1,0 +1,7 @@
+documento reescala
+  frame tela 400x200
+    camada base
+      cartao/fundo retangulo 40,40 320x100 tom=300 elev=1 de=cartao.yaml
+      cartao/avatar circulo 72,50 64x64 tom=500 elev=2 de=cartao.yaml
+      cartao/texto retangulo 168,60 160x30 tom=500 elev=2 de=cartao.yaml
+        nota: Título do cartão
