@@ -1,0 +1,10 @@
+documento basico
+  frame home 1280x800
+    camada fundo
+      topo retangulo 0,0 1280x400 tom=300 elev=1
+      cartao retangulo 128,80 384x160 tom=500 elev=2 round
+        nota: Cartão do topo
+      avatar circulo 154,96 51x51 tom=700 elev=3
+    camada conteudo
+      e0 retangulo 0,480 640x160 tom=300 elev=5
+      e1 circulo 0,480 128x128 tom=100 elev=6
