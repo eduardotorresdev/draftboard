@@ -291,6 +291,32 @@ aninhamento > **16**, `repeat.n` < 1, `axis` fora de {x,y}, `slot` em Documento,
 Elemento de área zero, Slot sem preenchimento e sem `default` (renderiza Superfície vazia
 com o degrau de Elevação).
 
+### 8b. Tetos de materialização (adendo, congelado)
+
+```go
+// em internal/resolve
+const LimiteDeClones    = 1_000   // clones por Repetição
+const LimiteDeElementos = 10_000  // Elementos materializados por Frame
+```
+
+`repeat.n` deve ser um número **finito** e inteiro em `[1, LimiteDeClones]`. Valor não
+finito, ou que estoure `int64` na conversão, é **erro** — nunca comportamento dependente
+de plataforma. O total de Elementos materializados num Frame não pode passar de
+`LimiteDeElementos`; excedeu, é **erro** com código 1, nomeando o Frame e o total.
+
+Os dois tetos existem porque Repetições encadeadas através de Componentes multiplicam:
+oito Componentes com `repeat: {n: 10}` cada, dentro do limite de 16 níveis, materializam
+10⁸ Elementos a partir de ~1 KB de YAML. O princípio é o mesmo do `§5b` — recusar rápido
+em vez de consumir memória até o processo morrer.
+
+### 8c. Unicidade do `<caminho>` (adendo, congelado)
+
+As duas regras de `§4` podem colidir: um Elemento com `id: X` e um Slot chamado `X` no
+mesmo espaço produzem o mesmo `<caminho>`. A resolução garante unicidade dentro de cada
+Frame: ao gerar um `<caminho>` já emitido, acrescenta o sufixo `~2`, `~3`, … na ordem de
+pintura. A regra é determinística, portanto o `<caminho>` continua estável entre edições
+que não mudem a ordem.
+
 Sugestão de chave: distância de Levenshtein ≤ 3 contra as chaves válidas daquele nível;
 formato `erro: card.yaml: elements[0]: campo desconhecido "rond"; você quis dizer "round"?`.
 Sem candidato dentro do limite, omite a sugestão.
