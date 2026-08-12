@@ -108,7 +108,7 @@ Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use` ou `slot
 - `round: true` só existe em `rect`. Cantos retos é o padrão.
 - `slots` só existe em `use`. `default` (lista de nós) só existe em `slot`.
 - `slot` só é válido dentro de Componente — nunca em Documento.
-- `note` é a Nota: texto anexado ao Elemento, fora do desenho.
+- `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); some inteira com `--notes off`.
 - `id` renomeia o segmento do Elemento no caminho da árvore.
 - Toda chave desconhecida, em qualquer nível, é erro com sugestão da chave próxima.
 
@@ -149,8 +149,11 @@ da conversão para px.
 em Superfícies empilhadas.
 
 - O Frame tem Elevação 0 e Tom 100. O Chrome usa 900, reservado.
-- Cada Camada adiciona um degrau sobre tudo abaixo dela.
-- Um Elemento contido geometricamente em outro fica um degrau acima dele.
+- Ordem de pintura: Camadas na ordem declarada, Elementos na ordem declarada dentro da Camada.
+- Cada Camada `i` parte de um piso: `base[0] = 0` e `base[i] = max(base[i-1], maiorElevacaoNaCamada[i-1]) + 1`.
+- O pai de um Elemento é o **último Elemento já pintado** (em qualquer Camada ≤ `i`) cuja bounding box contém a do Elemento, com contenção inclusiva. Sem pai, `elevacaoDoPai = base[i]`.
+- `Elevacao = max(elevacaoDoPai, base[i]) + 1` — pode subir mais de um degrau de uma vez quando o pai está numa Camada inferior.
+- Elemento recortado pela borda do Frame entra na contenção com a bounding box **declarada**, não com a recortada.
 - Superfícies adjacentes sempre diferem visivelmente; a escala nunca esgota.
 
 Consequência prática: para dar contraste a um Elemento, **aninhe-o** dentro de outro
