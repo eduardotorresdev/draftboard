@@ -287,6 +287,100 @@ func TestInstalaNaoSegueLinkSimbolicoNoDestino(t *testing.T) {
 	}
 }
 
+// TestInstalaSegueLinkSimbolicoNoDiretorio fixa uma decisão, não um acidente:
+// um link simbólico em <dir>/draftboard É seguido. Apontar o diretório de
+// skills para outro lugar é arranjo legítimo de operador, e nesse caso gravar
+// no alvo é o comportamento esperado. Contrasta de propósito com
+// TestInstalaNaoSegueLinkSimbolicoNoDestino, onde o link está no arquivo final
+// e NÃO é seguido.
+func TestInstalaSegueLinkSimbolicoNoDiretorio(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "skills")
+	fora := filepath.Join(base, "skills-de-verdade")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("preparar dir: %v", err)
+	}
+	if err := os.MkdirAll(fora, 0o755); err != nil {
+		t.Fatalf("preparar alvo: %v", err)
+	}
+	if err := os.Symlink(fora, filepath.Join(dir, "draftboard")); err != nil {
+		t.Skipf("ambiente não permite criar link simbólico: %v", err)
+	}
+
+	caminho, err := skill.Instala(dir)
+	if err != nil {
+		t.Fatalf("Instala devolveu erro: %v", err)
+	}
+
+	if caminho != filepath.Join(dir, "draftboard", "SKILL.md") {
+		t.Errorf("Instala devolveu %q, esperado o caminho pelo link", caminho)
+	}
+	// A skill tem de aparecer no alvo do link, que é o ponto da decisão.
+	gravado, err := os.ReadFile(filepath.Join(fora, "SKILL.md"))
+	if err != nil {
+		t.Fatalf("ler o arquivo no alvo do link: %v", err)
+	}
+	if string(gravado) != skill.Conteudo() {
+		t.Error("arquivo no alvo do link não bate com Conteudo()")
+	}
+}
+
+// TestInstalaPreservaInstalacaoAnteriorQuandoFalha: a gravação é atômica, então
+// um erro no meio não pode deixar o operador sem SKILL.md nem com um truncado.
+func TestInstalaPreservaInstalacaoAnteriorQuandoFalha(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignora permissões de diretório")
+	}
+	dir := t.TempDir()
+
+	caminho, err := skill.Instala(dir)
+	if err != nil {
+		t.Fatalf("instalação inicial devolveu erro: %v", err)
+	}
+	destino := filepath.Dir(caminho)
+
+	// Diretório somente-leitura: o temporário não pode ser criado.
+	if err := os.Chmod(destino, 0o500); err != nil {
+		t.Fatalf("restringir permissões: %v", err)
+	}
+	t.Cleanup(func() { os.Chmod(destino, 0o755) })
+
+	if _, err := skill.Instala(dir); err == nil {
+		t.Fatal("Instala devolveu nil num diretório somente-leitura")
+	}
+
+	sobrevivente, err := os.ReadFile(caminho)
+	if err != nil {
+		t.Fatalf("a instalação anterior sumiu: %v", err)
+	}
+	if string(sobrevivente) != skill.Conteudo() {
+		t.Error("a instalação anterior foi corrompida por uma instalação que falhou")
+	}
+}
+
+// TestInstalaNaoDeixaTemporarioParaTras: o arquivo temporário da gravação
+// atômica não pode virar lixo no diretório de skills.
+func TestInstalaNaoDeixaTemporarioParaTras(t *testing.T) {
+	dir := t.TempDir()
+
+	caminho, err := skill.Instala(dir)
+	if err != nil {
+		t.Fatalf("Instala devolveu erro: %v", err)
+	}
+
+	entradas, err := os.ReadDir(filepath.Dir(caminho))
+	if err != nil {
+		t.Fatalf("listar o destino: %v", err)
+	}
+	if len(entradas) != 1 || entradas[0].Name() != "SKILL.md" {
+		var nomes []string
+		for _, e := range entradas {
+			nomes = append(nomes, e.Name())
+		}
+		t.Errorf("destino tem %v, esperado só [SKILL.md]", nomes)
+	}
+}
+
 func TestInstalaFalhaQuandoODestinoNaoPodeSerCriado(t *testing.T) {
 	// Um arquivo comum no lugar do diretório impede o MkdirAll.
 	base := t.TempDir()

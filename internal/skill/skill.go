@@ -54,10 +54,20 @@ func Imprime(w io.Writer) error {
 // padrão é ~/.claude/skills. Reinstalar sobre uma instalação existente
 // substitui o arquivo e não é erro.
 //
-// A gravação nunca segue um link simbólico plantado no destino: um SKILL.md
-// preexistente é removido antes, e o arquivo novo é criado com O_EXCL e
-// O_NOFOLLOW. Instalar a skill não pode virar uma escrita arbitrária em outro
-// lugar da máquina de quem instala.
+// A gravação é atômica: o conteúdo vai para um arquivo temporário no mesmo
+// diretório e só então é renomeado por cima do destino. Disso saem três
+// garantias. Nunca existe um SKILL.md truncado ou ausente, nem quando a
+// gravação falha no meio — a instalação anterior sobrevive intacta. Um link
+// simbólico plantado em <dir>/draftboard/SKILL.md é substituído pelo arquivo,
+// não seguido, então instalar a skill não vira escrita no alvo do link. E não
+// há caso especial por sistema operacional.
+//
+// Um link simbólico no diretório <dir>/draftboard, porém, É seguido, e isso é
+// deliberado: apontar o diretório de skills para outro lugar (um repositório
+// de dotfiles, um volume compartilhado) é arranjo legítimo de operador, e
+// nesse caso gravar no alvo do link é exatamente o comportamento esperado. A
+// assimetria é intencional — o link no arquivo final é acidente ou ataque, o
+// link no diretório é configuração.
 func Instala(dir string) (string, error) {
 	if dir == "" {
 		padrao, err := diretorioPadrao()
@@ -71,21 +81,37 @@ func Instala(dir string) (string, error) {
 		return "", fmt.Errorf("criar diretório %s: %w", destino, err)
 	}
 	caminho := filepath.Join(destino, nomeDoArquivo)
-	if err := os.Remove(caminho); err != nil && !os.IsNotExist(err) {
-		return "", fmt.Errorf("remover %s: %w", caminho, err)
-	}
-	f, err := os.OpenFile(caminho, os.O_WRONLY|os.O_CREATE|os.O_EXCL|semSeguirLink, 0o644)
-	if err != nil {
-		return "", fmt.Errorf("gravar %s: %w", caminho, err)
-	}
-	if _, err := f.WriteString(conteudo); err != nil {
-		f.Close()
-		return "", fmt.Errorf("gravar %s: %w", caminho, err)
-	}
-	if err := f.Close(); err != nil {
-		return "", fmt.Errorf("fechar %s: %w", caminho, err)
+	if err := gravaAtomico(caminho, destino); err != nil {
+		return "", err
 	}
 	return caminho, nil
+}
+
+// gravaAtomico escreve a skill em caminho passando por um temporário em dir.
+// Em caso de falha, remove o temporário e deixa o destino como estava.
+func gravaAtomico(caminho, dir string) error {
+	tmp, err := os.CreateTemp(dir, ".SKILL.md-*")
+	if err != nil {
+		return fmt.Errorf("criar arquivo temporário em %s: %w", dir, err)
+	}
+	nomeTmp := tmp.Name()
+	defer os.Remove(nomeTmp) // no-op quando o rename já aconteceu
+
+	if _, err := tmp.WriteString(conteudo); err != nil {
+		tmp.Close()
+		return fmt.Errorf("gravar %s: %w", nomeTmp, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("fechar %s: %w", nomeTmp, err)
+	}
+	// CreateTemp cria com 0600; a skill é legível como qualquer doc instalado.
+	if err := os.Chmod(nomeTmp, 0o644); err != nil {
+		return fmt.Errorf("ajustar permissões de %s: %w", nomeTmp, err)
+	}
+	if err := os.Rename(nomeTmp, caminho); err != nil {
+		return fmt.Errorf("gravar %s: %w", caminho, err)
+	}
+	return nil
 }
 
 // diretorioPadrao devolve ~/.claude/skills.
