@@ -209,6 +209,24 @@ func DesenhaFrame(f scene.Frame, escala float64, margemT, margemD, margemB, marg
 
 `internal/notes` importa `internal/render`. **`internal/render` nunca importa `internal/notes`.**
 
+### 5b. Teto de área (adendo, congelado)
+
+```go
+// LimiteDeArea é o número máximo de pixels da tela de saída.
+const LimiteDeArea = 64 << 20 // 67 108 864 px (~256 MB de RGBA)
+```
+
+`NewCanvas` **satura** nas dimensões que caibam nesse teto em vez de alocar sem limite,
+e documenta a saturação. `DesenhaElemento` **recorta a bounding box do Elemento ao
+retângulo do Frame antes de rasterizar** — sem isso, extensão acima de 2²⁵ px de
+dispositivo trava o rasterizador do `freetype` num laço de CPU sem fim.
+
+A CLI (`§7`, dono F1) recusa **antes** de chegar aqui: `--scale` deve ser `> 0` e a área
+final `(margemE+l+margemD)*(margemT+a+margemB)*escala²` não pode passar de `LimiteDeArea`.
+Excedeu, é **erro** com código 1, nunca pânico nem swap.
+
+`Canvas` **não é seguro para uso concorrente**: um `Canvas` por goroutine.
+
 ## 6. `internal/notes` — plano de anotação (congelado, dono F4)
 
 ```go
