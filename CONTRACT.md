@@ -166,6 +166,13 @@ ou o `id` declarado quando houver. Instância acrescenta um segmento por nível 
 Componente; Slot acrescenta o segmento `<nome-do-slot>`. Exemplos:
 `e0`, `header`, `e3/e1`, `e3/body/e0`.
 
+**Adendo 4b (clones de Repetição).** Um nó com `repeat` acrescenta ao próprio segmento o
+sufixo `#<indice>`, com o índice começando em `0` e emitido **sempre**, inclusive quando
+`n` é 1. O sufixo é determinístico, independe da ordem de pintura e diz *qual* clone é —
+informação que o desempate do §8c não carrega. Exemplo: `e1#0`, `e1#1`, `grade#2/e0`.
+Os dois mecanismos coexistem e se aplicam nesta ordem: primeiro `#<indice>`, depois, se o
+caminho resultante ainda colidir, o `~2`/`~3` do §8c.
+
 `de=` aparece só quando `Origem != ""`.
 
 Nada é escrito em disco por `inspect`.
