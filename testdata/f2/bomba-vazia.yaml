@@ -1,0 +1,12 @@
+# Cadeia de Repetições sobre um Componente de folha vazia: 10^9 tentativas de
+# materializar que não criam Elemento nenhum. Sem orçamento cobrado por
+# tentativa isso não estoura a memória — simplesmente não termina.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./bomba/v1.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

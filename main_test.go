@@ -211,6 +211,7 @@ func TestValidateReprovaDocumentoInvalido(t *testing.T) {
 		{"frames vazio", "frames-vazio.yaml", "frames-vazio.txt"},
 		{"largura do Frame ausente", "frame-sem-largura.yaml", "frame-sem-largura.txt"},
 		{"largura do Frame igual a zero", "frame-largura-zero.yaml", "frame-largura-zero.txt"},
+		{"largura do Frame acima do máximo em pixels", "frame-largura-absurda.yaml", "frame-largura-absurda.txt"},
 		{"mais de uma chave discriminante", "duas-discriminantes.yaml", "duas-discriminantes.txt"},
 		{"n da Repetição menor que 1", "repeticao-n.yaml", "repeticao-n.txt"},
 		{"eixo da Repetição fora de x e y", "repeticao-eixo.yaml", "repeticao-eixo.txt"},

@@ -1,0 +1,5 @@
+# Fundo da cadeia: um Retângulo por clone, 1000^16 no total.
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 100}
+    id: folha
+    repeat: {n: 1000, axis: x, gap: 0}

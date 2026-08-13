@@ -1,0 +1,6 @@
+# Largura que não cabe num int64: convertida direto, satura no maior inteiro
+# da plataforma (ou vira negativa) em vez de ser recusada.
+frames:
+  - name: home
+    w: 1e30
+    h: 800

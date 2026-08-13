@@ -1,0 +1,1 @@
+erro: bomba-vazia.yaml: frames[0].layers[0].elements[0] -> ./bomba/v1.yaml: elements[0] -> ./v2.yaml: elements[0] -> ./v3.yaml: elements[0]: o Frame "tela" passou do teto de 10000 Elementos materializados: reduza a Repetição ou a cadeia de Componentes

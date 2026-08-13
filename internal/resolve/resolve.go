@@ -43,12 +43,12 @@ func Arquivo(caminho string) (*scene.Documento, []scene.Aviso, error) {
 	for _, f := range doc.Frames {
 		frame, err := r.frame(f)
 		if err != nil {
-			return nil, r.avisos, err
+			return nil, r.fechaAvisos(), err
 		}
 		atribuiElevacao(frame.Camadas)
 		resolvido.Frames = append(resolvido.Frames, frame)
 	}
-	return resolvido, r.avisos, nil
+	return resolvido, r.fechaAvisos(), nil
 }
 
 // resolucao carrega o estado comum das duas fases: o arquivo de origem, os
@@ -59,6 +59,10 @@ type resolucao struct {
 	// Origem que o `inspect` imprime.
 	dirDoDocumento string
 	avisos         []scene.Aviso
+	// avisosOmitidos conta os avisos descartados por causa do teto, e
+	// localDoCorte guarda onde o corte começou.
+	avisosOmitidos int
+	localDoCorte   string
 	// componentes guarda cada Componente já decodificado pelo seu caminho
 	// absoluto, para que um Componente usado muitas vezes seja lido uma só.
 	componentes map[string]*schema.Componente
@@ -67,7 +71,7 @@ type resolucao struct {
 	// do teto de materialização.
 	frameNome      string
 	frameL, frameA float64
-	// materializados conta os Elementos já criados no Frame, contra
+	// materializados conta os clones de nó já debitados no Frame, contra
 	// LimiteDeElementos.
 	materializados int
 	// caminhos são os <caminho> já emitidos no Frame, para que dois
@@ -75,8 +79,31 @@ type resolucao struct {
 	caminhos map[string]bool
 }
 
+// aviso acumula um aviso, até LimiteDeAvisos. Acima dele os avisos são
+// contados e omitidos, e o resumo entra no lugar em fechaAvisos.
 func (r *resolucao) aviso(local, msg string) {
+	if len(r.avisos) >= LimiteDeAvisos {
+		if r.avisosOmitidos == 0 {
+			r.localDoCorte = local
+		}
+		r.avisosOmitidos++
+		return
+	}
 	r.avisos = append(r.avisos, scene.Aviso{Arquivo: r.arquivo, Local: local, Msg: msg})
+}
+
+// fechaAvisos acrescenta, quando houve corte, o aviso que diz quantos ficaram
+// de fora — para que a lista truncada nunca passe por lista completa.
+func (r *resolucao) fechaAvisos() []scene.Aviso {
+	if r.avisosOmitidos == 0 {
+		return r.avisos
+	}
+	return append(r.avisos, scene.Aviso{
+		Arquivo: r.arquivo,
+		Local:   r.localDoCorte,
+		Msg: fmt.Sprintf("teto de %d avisos atingido: %d avisos daqui em diante foram omitidos",
+			LimiteDeAvisos, r.avisosOmitidos),
+	})
 }
 
 // erro devolve um erro de resolução já posicionado no Documento raiz. local

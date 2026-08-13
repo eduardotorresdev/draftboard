@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -422,10 +423,14 @@ func (l *leitor) repeticao(n *yaml.Node, local string) (Repeticao, error) {
 	if err != nil {
 		return Repeticao{}, err
 	}
-	// O arredondamento fica em float64: o teto de clones é da resolução, e a
+	// A quantidade fica em float64: o teto de clones é da resolução, e a
 	// conversão para int de um valor que estoura o int64 depende de
-	// plataforma.
-	r.N = math.Round(quantos)
+	// plataforma. Fracionário é recusado em vez de arredondado, para que a
+	// mensagem de erro nunca cite um número que o usuário não escreveu.
+	if quantos != math.Trunc(quantos) {
+		return Repeticao{}, l.erro(local, `campo "n" da Repetição espera um número inteiro, encontrou %s`, formataNumero(quantos))
+	}
+	r.N = quantos
 	if r.N < 1 {
 		return Repeticao{}, l.erro(local, `campo "n" da Repetição deve ser no mínimo 1`)
 	}
@@ -514,18 +519,38 @@ func (l *leitor) booleano(m *mapaLido, campo string) (bool, error) {
 	return v, nil
 }
 
-// dimensao lê uma dimensão de Frame em pixels: obrigatória e maior que zero.
-// Campo ausente é lido como zero e cai na mesma mensagem.
+// limiteDeDimensao é a maior dimensão de Frame aceita em pixels. O valor não
+// tem nada de especial além de caber com folga num int em qualquer plataforma:
+// qualquer Frame perto disso já é recusado pelo teto de área da CLI. O que
+// importa é existir um teto — sem ele, `w: 1e30` satura o int64 e o Frame passa
+// a valer 9223372036854775807 px, com código de saída 0.
+const limiteDeDimensao = 1 << 30
+
+// dimensao lê uma dimensão de Frame em pixels: obrigatória, maior que zero e
+// dentro do que um int representa. Campo ausente é lido como zero e cai na
+// mensagem de obrigatoriedade.
 func (l *leitor) dimensao(m *mapaLido, campo string) (int, error) {
 	v, err := l.numero(m, campo)
 	if err != nil {
 		return 0, err
 	}
-	px := int(math.Round(v))
+	// A comparação é feita em float64, antes da conversão: converter
+	// primeiro satura no extremo do int64 e esconde o problema.
+	px := math.Round(v)
 	if px <= 0 {
 		return 0, l.erro(m.local, "campo %q é obrigatório e deve ser maior que zero", campo)
 	}
-	return px, nil
+	if px > limiteDeDimensao {
+		return 0, l.erro(m.local, "campo %q passa do máximo de %d pixels, encontrou %s",
+			campo, limiteDeDimensao, formataNumero(v))
+	}
+	return int(px), nil
+}
+
+// formataNumero escreve um número como o usuário reconhece, sem notação
+// científica inventada nem casas decimais que ele não digitou.
+func formataNumero(v float64) string {
+	return strconv.FormatFloat(v, 'g', -1, 64)
 }
 
 // sequencia lê a sequência guardada em campo. Campo ausente devolve nil.

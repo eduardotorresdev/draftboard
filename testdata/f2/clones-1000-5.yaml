@@ -1,0 +1,10 @@
+# Fração logo acima do teto: a mensagem tem que citar o que foi escrito, 1000.5, e não um 1001 arredondado que ninguém digitou.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 100}
+            repeat: {n: 1000.5, axis: x, gap: 0}

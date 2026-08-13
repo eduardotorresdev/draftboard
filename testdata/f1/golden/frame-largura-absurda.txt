@@ -1,0 +1,1 @@
+erro: frame-largura-absurda.yaml: frames[0]: campo "w" passa do máximo de 1073741824 pixels, encontrou 1e+30

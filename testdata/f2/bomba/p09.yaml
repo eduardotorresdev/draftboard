@@ -1,0 +1,5 @@
+# Nível 9 de dezesseis, cada um repetindo mil vezes o nível seguinte.
+elements:
+  - use: "./p10.yaml"
+    box: {x: 0, y: 0, w: 100, h: 100}
+    repeat: {n: 1000, axis: x, gap: 0}

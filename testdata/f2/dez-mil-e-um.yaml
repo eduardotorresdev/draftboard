@@ -1,4 +1,5 @@
-# Um Elemento além do teto de materialização do Frame.
+# Um clone de nó além de LimiteDeElementos: 10 Repetições de 1000 mais um nó
+# solto. O de número 10001 é recusado.
 frames:
   - name: tela
     w: 100
@@ -6,9 +7,35 @@ frames:
     layers:
       - name: base
         elements:
-          - use: "./mil.yaml"
-            box: {x: 0, y: 0, w: 10, h: 100}
-            id: bloco
-            repeat: {n: 10, axis: x, gap: 0}
-          - rect: {x: 0, y: 0, w: 100, h: 100}
-            id: sobra
+          - rect: {x: 0, y: 0, w: 0.1, h: 10}
+            id: fila0
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 10, w: 0.1, h: 10}
+            id: fila1
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 20, w: 0.1, h: 10}
+            id: fila2
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 30, w: 0.1, h: 10}
+            id: fila3
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 40, w: 0.1, h: 10}
+            id: fila4
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 50, w: 0.1, h: 10}
+            id: fila5
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 60, w: 0.1, h: 10}
+            id: fila6
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 70, w: 0.1, h: 10}
+            id: fila7
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 80, w: 0.1, h: 10}
+            id: fila8
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 90, w: 0.1, h: 10}
+            id: fila9
+            repeat: {n: 1000, axis: x, gap: 0}
+          - rect: {x: 0, y: 0, w: 1, h: 1}
+            id: gota

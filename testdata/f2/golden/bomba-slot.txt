@@ -1,0 +1,1 @@
+erro: bomba-slot.yaml: frames[0].layers[0].elements[0] -> ./bomba/s1.yaml: elements[0].default[0] -> ./s2.yaml: elements[0].default[0] -> ./s3.yaml: elements[0].default[0]: o Frame "tela" passou do teto de 10000 Elementos materializados: reduza a Repetição ou a cadeia de Componentes

@@ -22,7 +22,20 @@ const LimiteDeClones = 1_000
 // Repetições encadeadas por Componentes multiplicam: oito Componentes com
 // `repeat: {n: 10}` cada, dentro do limite de profundidade, materializariam 10⁸
 // Elementos a partir de um punhado de bytes de YAML.
+//
+// O orçamento é debitado por clone de nó, antes de o nó ser resolvido, e não
+// no nascimento do Elemento. Todo Elemento é o clone de exatamente um nó, então
+// o teto continua valendo ao pé da letra para Elementos; e as Instâncias e os
+// Slots, que expandem sem materializar nada por conta própria, também pagam.
+// Sem isso, uma cadeia de Repetições sobre um Componente vazio atravessa o teto
+// sem nunca encostar nele: não estoura a memória, simplesmente não termina.
 const LimiteDeElementos = 10_000
+
+// LimiteDeAvisos é o número máximo de avisos guardados num Documento. Acima
+// dele os avisos são contados e omitidos: um `repeat` de dez bytes gera dez mil
+// avisos por Frame, e a lista inteira na memória é o mesmo problema em outra
+// roupa.
+const LimiteDeAvisos = 1_000
 
 // espaco é o retângulo em pixels do Frame onde um espaço de coordenadas local
 // de 0 a 100 está projetado. O espaço do Frame é o próprio Frame na origem; o
@@ -103,6 +116,12 @@ func (r *resolucao) achata(nos []schema.No, esp espaco, prefixo string, ctx cont
 			clones = quantos
 			passo = tamanhoNoEixo(no, no.Repeticao.Eixo) + no.Repeticao.Intervalo
 		}
+		// O orçamento do Frame é debitado aqui, antes de resolver o nó:
+		// é o único ponto por onde passa toda tentativa de materializar,
+		// inclusive a que não chega a criar Elemento nenhum.
+		if err := r.debita(clones, ctx.prefixo+no.Local); err != nil {
+			return err
+		}
 		for c := 0; c < clones; c++ {
 			var dx, dy float64
 			caminhoDoClone := caminho
@@ -121,6 +140,18 @@ func (r *resolucao) achata(nos []schema.No, esp espaco, prefixo string, ctx cont
 			}
 		}
 	}
+	return nil
+}
+
+// debita cobra do orçamento do Frame a quantidade de clones que um nó vai
+// tentar materializar, e recusa o Documento quando o orçamento acaba.
+func (r *resolucao) debita(quantos int, local string) error {
+	if r.materializados+quantos > LimiteDeElementos {
+		return r.erro(local,
+			"o Frame %q passou do teto de %d Elementos materializados: reduza a Repetição ou a cadeia de Componentes",
+			r.frameNome, LimiteDeElementos)
+	}
+	r.materializados += quantos
 	return nil
 }
 
@@ -144,12 +175,14 @@ func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminh
 	case schema.TipoRetangulo:
 		c := desloca(*no.Retangulo, dx, dy)
 		x, y, l, a := esp.retangulo(c)
-		return r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+		r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+		return nil
 	case schema.TipoCirculo:
 		d := *no.Circulo
 		d.X, d.Y = d.X+dx, d.Y+dy
 		x, y, l, a := esp.circulo(d)
-		return r.acrescenta(dest, no, caminho, ctx, scene.Circulo, x, y, l, a)
+		r.acrescenta(dest, no, caminho, ctx, scene.Circulo, x, y, l, a)
+		return nil
 	case schema.TipoSlot:
 		return r.slot(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
 	default:
@@ -220,7 +253,8 @@ func (r *resolucao) slot(no schema.No, esp espaco, caixa schema.Caixa, caminho s
 	r.aviso(ctx.prefixo+no.Local, fmt.Sprintf(
 		"Slot %q%s sem preenchimento e sem conteúdo padrão: renderiza uma Superfície vazia",
 		no.Slot, declaradoEm(ctx)))
-	return r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+	r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+	return nil
 }
 
 func declaradoEm(ctx contexto) string {
@@ -253,12 +287,17 @@ func (r *resolucao) carrega(referencia, local string, ctx contexto) (*schema.Com
 		return nil, contexto{}, r.erro(local,
 			"aninhamento de Componentes acima do limite de %d níveis em %q", LimiteDeProfundidade, referencia)
 	}
-	if _, err := os.Stat(caminho); err != nil {
-		return nil, contexto{}, r.erro(local, "Componente não encontrado: %q", referencia)
-	}
-
+	// O Componente já lido não volta ao disco: numa Repetição de Instância a
+	// mesma referência é resolvida a cada clone.
 	comp, ok := r.componentes[chave]
 	if !ok {
+		info, err := os.Stat(caminho)
+		switch {
+		case err != nil:
+			return nil, contexto{}, r.erro(local, "Componente não encontrado: %q", referencia)
+		case info.IsDir():
+			return nil, contexto{}, r.erro(local, "Componente é um diretório, não um arquivo: %q", referencia)
+		}
 		lido, err := schema.LeComponente(caminho)
 		if err != nil {
 			return nil, contexto{}, r.reposiciona(err, local, referencia)
@@ -306,16 +345,11 @@ func (r *resolucao) reposiciona(err error, local, referencia string) error {
 }
 
 // acrescenta materializa um Elemento com geometria já absoluta e emite os
-// avisos que dependem só da geometria. É o único ponto onde um Elemento nasce:
-// aqui o teto de materialização do Frame é conferido e o caminho é desambiguado.
-func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) error {
+// avisos que dependem só da geometria. É o único ponto onde um Elemento nasce,
+// e onde o caminho é desambiguado. O orçamento do Frame já foi debitado pelo
+// clone que trouxe o nó até aqui.
+func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) {
 	local := ctx.prefixo + no.Local
-	if r.materializados >= LimiteDeElementos {
-		return r.erro(local,
-			"o Frame %q materializou mais de %d Elementos: reduza a Repetição ou a cadeia de Componentes",
-			r.frameNome, LimiteDeElementos)
-	}
-	r.materializados++
 	if x < 0 || y < 0 || x+l > r.frameL || y+a > r.frameA {
 		r.aviso(local, "Elemento fora do Frame: será recortado na borda")
 	}
@@ -334,7 +368,6 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		Origem:      ctx.origem,
 		Nota:        no.Nota,
 	})
-	return nil
 }
 
 // caminhoUnico garante que dois Elementos do mesmo Frame nunca compartilhem o

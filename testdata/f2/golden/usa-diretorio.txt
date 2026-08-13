@@ -1,0 +1,1 @@
+erro: usa-diretorio.yaml: frames[0].layers[0].elements[0]: Componente é um diretório, não um arquivo: "./pecas"

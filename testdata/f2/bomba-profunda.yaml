@@ -1,0 +1,11 @@
+# Dezesseis níveis de Repetição de mil, todos dentro do limite de
+# profundidade: 10^48 Elementos pedidos a partir de menos de 1 KB de YAML.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./bomba/p01.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

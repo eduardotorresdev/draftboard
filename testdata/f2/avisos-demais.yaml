@@ -1,0 +1,15 @@
+# Duas Instâncias de mil Slots vazios: 2000 avisos pedidos, e o teto de avisos
+# corta a lista antes que ela deixe de caber na tela.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./vazios.yaml"
+            box: {x: 0, y: 0, w: 50, h: 100}
+            id: esquerda
+          - use: "./vazios.yaml"
+            box: {x: 50, y: 0, w: 50, h: 100}
+            id: direita

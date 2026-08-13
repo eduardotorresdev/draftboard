@@ -294,8 +294,9 @@ func TestOrigemEhSempreRelativa(t *testing.T) {
 // --- Unicidade do caminho ---------------------------------------------------
 
 // TestCaminhoNuncaSeRepeteNoFrame cobre a colisão entre as duas regras de
-// segmento — um Elemento com `id: corpo` e um Slot chamado `corpo` no mesmo
-// espaço — e a precedência do nome do Slot sobre um id declarado no mesmo nó.
+// segmento — Elementos com `id: corpo` e um Slot chamado `corpo` no mesmo
+// espaço —, a precedência do nome do Slot sobre um id declarado no mesmo nó e
+// a desambiguação de três colisões seguidas do mesmo caminho.
 func TestCaminhoNuncaSeRepeteNoFrame(t *testing.T) {
 	naPastaDeReuso(t)
 	codigo, stdout, stderr := executa("inspect", "colisao.yaml")
@@ -309,6 +310,14 @@ func TestCaminhoNuncaSeRepeteNoFrame(t *testing.T) {
 	}
 	if linha := linhaDe(t, stdout, "c/corpo~2"); !strings.Contains(linha, "20,20 50x50") {
 		t.Errorf("o Slot homônimo não foi desambiguado: %s", linha)
+	}
+	// Três colisões seguidas: cada sufixo tem que ser novo, não basta gerar
+	// um candidato — o candidato também entra no conjunto de caminhos usados.
+	if linha := linhaDe(t, stdout, "c/corpo~3"); !strings.Contains(linha, "0,20 10x10") {
+		t.Errorf("a terceira colisão não foi desambiguada: %s", linha)
+	}
+	if linha := linhaDe(t, stdout, "c/corpo~4"); !strings.Contains(linha, "0,40 10x10") {
+		t.Errorf("a quarta colisão não foi desambiguada: %s", linha)
 	}
 	// O segmento de um Slot é o nome do Slot, mesmo quando o nó declara id.
 	linhaDe(t, stdout, "c/pe")
@@ -360,6 +369,8 @@ func TestValidateRecusaMaterializacaoAcimaDoTeto(t *testing.T) {
 		{"um clone além do teto", "clones-1001.yaml", "clones-1001.txt"},
 		{"clones que estouram o int64", "clones-1e19.yaml", "clones-1e19.txt"},
 		{"clones em ordem de grandeza absurda", "clones-1e30.yaml", "clones-1e30.txt"},
+		{"clones fracionários", "clones-fracionario.yaml", "clones-fracionario.txt"},
+		{"fração logo acima do teto", "clones-1000-5.yaml", "clones-1000-5.txt"},
 		{"Elementos acima do teto do Frame", "dez-mil-e-um.yaml", "dez-mil-e-um.txt"},
 		{"Repetições multiplicadas por Componentes", "multiplica.yaml", "multiplica.txt"},
 	}
@@ -380,6 +391,103 @@ func TestValidateRecusaMaterializacaoAcimaDoTeto(t *testing.T) {
 			conferaGolden(t, c.golden, stderr)
 		})
 	}
+}
+
+// TestValidateRecusaBombaDeMaterializacao fixa a forma da bomba que nenhum
+// contador de Elementos nascidos pega: cadeias de Repetição que pedem trabalho
+// exponencial e não materializam nada, ou quase nada. Sem orçamento cobrado
+// por tentativa de materializar, o processo não estoura a memória — ele
+// simplesmente não termina.
+func TestValidateRecusaBombaDeMaterializacao(t *testing.T) {
+	casos := []struct{ nome, fixture, golden string }{
+		{"cadeia de Repetições sobre folha vazia", "bomba-vazia.yaml", "bomba-vazia.txt"},
+		{"a mesma cadeia pela porta do Slot", "bomba-slot.yaml", "bomba-slot.txt"},
+		{"dezesseis níveis de mil clones", "bomba-profunda.yaml", "bomba-profunda.txt"},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			naPastaDeReuso(t)
+			// A bomba não é lenta, é interminável: sem prazo, o que
+			// se vê é o teste travado, e a falha só aparece no
+			// timeout global do `go test`, sem dizer o que travou.
+			codigo, stdout, stderr, dentroDoPrazo := executaComPrazo(5*time.Second, "validate", c.fixture)
+			if !dentroDoPrazo {
+				t.Fatalf("a recusa não veio em 5s: o orçamento não está sendo debitado por tentativa de materializar")
+			}
+			if codigo != 1 {
+				t.Errorf("código de saída = %d, queria 1", codigo)
+			}
+			if stdout != "" {
+				t.Errorf("stdout = %q, queria vazio", stdout)
+			}
+			conferaGolden(t, c.golden, stderr)
+		})
+	}
+}
+
+// TestValidateCortaAListaDeAvisos fixa o teto da lista de avisos: uma
+// Repetição de Slots vazios pede um aviso por clone, e uma lista de milhares
+// de linhas esconde o que importa em vez de mostrar. A lista truncada nunca
+// pode passar por lista completa, então o corte se anuncia.
+//
+// Não tem golden: o que se fixa aqui é a contagem e a última linha, não as mil
+// linhas iguais que vêm antes.
+func TestValidateCortaAListaDeAvisos(t *testing.T) {
+	naPastaDeReuso(t)
+	codigo, stdout, stderr := executa("validate", "avisos-demais.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, primeirasLinhas(stderr, 3))
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, queria vazio", stdout)
+	}
+	linhas := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
+	// Mil avisos mais a linha que diz quantos ficaram de fora.
+	if len(linhas) != 1001 {
+		t.Fatalf("saíram %d linhas de aviso, queria 1001", len(linhas))
+	}
+	ultima := linhas[len(linhas)-1]
+	if !strings.Contains(ultima, "teto de 1000 avisos atingido") ||
+		!strings.Contains(ultima, "1000 avisos daqui em diante foram omitidos") {
+		t.Errorf("a lista truncada não se anuncia: %s", ultima)
+	}
+	// O resumo é o último: o usuário lê a lista de cima para baixo e o corte
+	// tem que ser a última coisa que ele vê.
+	for _, linha := range linhas[:len(linhas)-1] {
+		if strings.Contains(linha, "teto de 1000 avisos") {
+			t.Errorf("o resumo do corte apareceu no meio da lista: %s", linha)
+		}
+	}
+}
+
+// executaComPrazo roda o CLI e desiste de esperar depois de prazo. A goroutine
+// que ficou para trás continua rodando até o fim do processo de teste: é o
+// preço de conseguir dizer "não terminou" em vez de travar junto.
+func executaComPrazo(prazo time.Duration, args ...string) (codigo int, stdout, stderr string, dentroDoPrazo bool) {
+	type saida struct {
+		codigo         int
+		stdout, stderr string
+	}
+	pronto := make(chan saida, 1)
+	go func() {
+		c, o, e := executa(args...)
+		pronto <- saida{c, o, e}
+	}()
+	select {
+	case s := <-pronto:
+		return s.codigo, s.stdout, s.stderr, true
+	case <-time.After(prazo):
+		return 0, "", "", false
+	}
+}
+
+// primeirasLinhas encurta uma saída longa para caber numa mensagem de falha.
+func primeirasLinhas(s string, n int) string {
+	linhas := strings.Split(s, "\n")
+	if len(linhas) <= n {
+		return s
+	}
+	return strings.Join(linhas[:n], "\n") + "\n..."
 }
 
 // TestValidateAceitaMaterializacaoNoTeto fixa que os dois tetos são inclusivos.
@@ -412,6 +520,7 @@ func TestValidateAceitaMaterializacaoNoTeto(t *testing.T) {
 func TestValidateReprovaReusoInvalido(t *testing.T) {
 	casos := []struct{ nome, fixture, golden string }{
 		{"Componente inexistente", "inexistente.yaml", "inexistente.txt"},
+		{"Instância que aponta para um diretório", "usa-diretorio.yaml", "usa-diretorio.txt"},
 		{"Componente inexistente dentro de outro Componente", "inexistente-aninhado.yaml", "inexistente-aninhado.txt"},
 		{"ciclo de referência entre Componentes", "ciclo.yaml", "ciclo.txt"},
 		{"profundidade de aninhamento acima do limite", "profundidade-17.yaml", "profundidade-17.txt"},

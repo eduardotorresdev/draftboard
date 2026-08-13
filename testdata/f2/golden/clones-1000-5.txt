@@ -1,0 +1,1 @@
+erro: clones-1000-5.yaml: frames[0].layers[0].elements[0].repeat: campo "n" da Repetição espera um número inteiro, encontrou 1000.5

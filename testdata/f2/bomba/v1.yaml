@@ -1,0 +1,5 @@
+# Elo da cadeia que repete mil vezes um Componente que não materializa nada.
+elements:
+  - use: "./v2.yaml"
+    box: {x: 0, y: 0, w: 100, h: 100}
+    repeat: {n: 1000, axis: x, gap: 0}

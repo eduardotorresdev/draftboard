@@ -1,0 +1,9 @@
+# Elo da cadeia pela porta do Slot: o conteúdo padrão do Slot instancia o elo
+# seguinte, e a Repetição está no próprio nó de Slot.
+elements:
+  - slot: "dentro"
+    box: {x: 0, y: 0, w: 100, h: 100}
+    repeat: {n: 1000, axis: x, gap: 0}
+    default:
+      - use: "./s2.yaml"
+        box: {x: 0, y: 0, w: 100, h: 100}

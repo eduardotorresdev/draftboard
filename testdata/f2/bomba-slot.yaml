@@ -1,0 +1,11 @@
+# A mesma bomba pela porta do Slot: o conteúdo padrão de cada Slot instancia o
+# elo seguinte, e a Repetição mora no nó de Slot.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./bomba/s1.yaml"
+            box: {x: 0, y: 0, w: 100, h: 100}

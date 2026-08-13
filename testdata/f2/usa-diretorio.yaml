@@ -1,0 +1,11 @@
+# Instância que aponta para uma pasta em vez de um arquivo: o erro tem que
+# dizer isso, não "não foi possível ler o arquivo" com o texto do sistema.
+frames:
+  - name: tela
+    w: 100
+    h: 100
+    layers:
+      - name: base
+        elements:
+          - use: "./pecas"
+            box: {x: 0, y: 0, w: 100, h: 100}
