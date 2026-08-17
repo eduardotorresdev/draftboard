@@ -1,6 +1,7 @@
 package render
 
 import (
+	"math"
 	"strings"
 	"sync"
 
@@ -96,6 +97,20 @@ func (c *Canvas) QuebraTexto(s string, tamanho, larguraMax float64) []string {
 	return linhas
 }
 
+// limiteDaFonte é o maior tamanho de fonte, em px de dispositivo, que se pode
+// pedir ao freetype. O truetype aloca a máscara de um glifo proporcional ao
+// quadrado do tamanho, então uma fonte sem teto custa memória sem teto: com
+// `--scale 10000`, medir "Mg" para a régua das Notas pede uma fonte de cem mil
+// px e derruba o processo por falta de memória ANTES de o teto de área chegar a
+// recusar a tela.
+//
+// O teto é a raiz de LimiteDeArea justamente para que a fonte nunca custe mais
+// que a maior tela permitida. Qualquer render que sobreviva ao teto de área
+// está ordens de grandeza abaixo daqui, então o corte só alcança escalas que já
+// seriam recusadas — o que muda é que agora elas são recusadas com código 1 e
+// mensagem, em vez de com um `out of memory`.
+var limiteDaFonte = math.Sqrt(LimiteDeArea)
+
 // face devolve a fonte no tamanho pedido, convertido para px de dispositivo.
 func (c *Canvas) face(tamanho float64) font.Face {
 	td := tamanho * c.escala
@@ -104,6 +119,9 @@ func (c *Canvas) face(tamanho float64) font.Face {
 		// Normalizamos para 1 — se não, a chave nunca acerta a memória (NaN
 		// não é igual a si mesmo) e o mapa cresceria sem limite.
 		td = 1
+	}
+	if td > limiteDaFonte {
+		td = limiteDaFonte
 	}
 	if f, ok := c.faces[td]; ok {
 		return f

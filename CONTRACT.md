@@ -333,6 +333,18 @@ Excedeu, é **erro** com código 1, nunca pânico nem swap.
 
 `Canvas` **não é seguro para uso concorrente**: um `Canvas` por goroutine.
 
+### Adendo 5c (teto de tamanho da fonte)
+
+O tamanho de fonte pedido ao `freetype` satura em `√LimiteDeArea` px de
+dispositivo. A máscara de um glifo custa memória proporcional ao **quadrado** do
+tamanho, e a régua do plano de anotação (§6) mede texto na escala do desenho
+final antes de a CLI conferir o teto de área: sem saturação, `--scale 10000`
+matava o processo por falta de memória em vez de sair com código 1 e mensagem.
+
+O teto é a raiz de `LimiteDeArea` para que uma fonte nunca custe mais que a maior
+tela permitida. Todo render que passa pelo teto de área está ordens de grandeza
+abaixo dele, então a saturação só alcança escalas que já seriam recusadas.
+
 ## 6. `internal/notes` — plano de anotação (congelado, dono F4)
 
 ```go

@@ -688,3 +688,22 @@ func TestDimensoesDaTelaGarantemOTetoSozinhas(t *testing.T) {
 		})
 	}
 }
+
+// TestFonteNaoAlocaSemTeto fixa o teto de tamanho da fonte. O truetype aloca a
+// máscara de um glifo proporcional ao quadrado do tamanho, então uma escala
+// grande pedia uma fonte de centenas de milhares de px e derrubava o processo
+// por falta de memória — antes de o teto de área chegar a recusar a tela, e
+// portanto sem mensagem nenhuma. Sem o teto, este teste não falha: ele mata o
+// binário de teste inteiro, que é exatamente o defeito.
+func TestFonteNaoAlocaSemTeto(t *testing.T) {
+	// A régua das Notas é assim: uma tela mínima na escala do desenho final.
+	c := NewCanvas(1, 1, 0, 0, 0, 0, 1e5)
+
+	l, a := c.MedeTexto("Mg", 11)
+	if math.IsNaN(l) || math.IsInf(l, 0) || l <= 0 {
+		t.Errorf("largura medida = %v, queria um número positivo e finito", l)
+	}
+	if math.IsNaN(a) || math.IsInf(a, 0) || a <= 0 {
+		t.Errorf("altura medida = %v, queria um número positivo e finito", a)
+	}
+}
