@@ -1,0 +1,32 @@
+frames:
+  - name: catalogo
+    w: 1280
+    h: 800
+    layers:
+      - name: conteudo
+        elements:
+          - control: tabs
+            box: {x: 4, y: 4, w: 92, h: 7}
+            items: ["Perfil", "Conta", "Faturas", "Ajuda"]
+            active: 2
+            id: abas
+            note: "Navegação principal"
+          - control: input
+            box: {x: 4, y: 16, w: 45, h: 7}
+            label: "Buscar produtos"
+          - control: input
+            box: {x: 52, y: 16, w: 44, h: 7}
+          - control: slider
+            box: {x: 4, y: 30, w: 45, h: 4}
+            value: 70
+          - control: slider
+            box: {x: 52, y: 30, w: 44, h: 4}
+            value: 0
+          - control: button
+            box: {x: 4, y: 40, w: 18, h: 7}
+            label: "Salvar"
+          - control: button
+            box: {x: 25, y: 40, w: 18, h: 7}
+          - control: tabs
+            box: {x: 4, y: 52, w: 45, h: 6}
+            items: 5

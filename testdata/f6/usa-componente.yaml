@@ -1,0 +1,10 @@
+frames:
+  - name: t
+    w: 800
+    h: 400
+    layers:
+      - name: c
+        elements:
+          - use: "./no-componente.yaml"
+            box: {x: 10, y: 10, w: 40, h: 50}
+            id: form

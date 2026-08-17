@@ -1,0 +1,1 @@
+erro: ativo-alem.yaml: frames[0].layers[0].elements[0]: campo "active" do Controle aponta o item 9, mas só existem 3 itens

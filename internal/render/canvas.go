@@ -138,18 +138,41 @@ func (c *Canvas) DesenhaElemento(e scene.Elemento) {
 		return
 	}
 
+	// O Rótulo não é um caminho a preencher: sai por glifos, com máscara
+	// própria, e por isso não passa pelo Fill comum às outras Formas.
+	if e.Forma == scene.Texto {
+		c.desenhaRotulo(e, x, y, l, a)
+		return
+	}
+
 	// A máscara tem sempre o tamanho da tela, então SetMask não pode falhar.
 	_ = c.dc.SetMask(c.mascaraDoFrame())
 	c.dc.SetColor(cor(e.Tom))
 
-	if e.Forma == scene.Circulo {
+	switch e.Forma {
+	case scene.Circulo:
 		c.tracaCirculo(x, y, l, a, fx0, fy0, fx1, fy1)
-	} else {
+	default:
 		c.tracaRetangulo(e, x, y, l, a, fx0, fy0, fx1, fy1)
 	}
 
 	c.dc.Fill()
 	c.dc.ResetClip()
+}
+
+// mascaraDaArea devolve a máscara do retângulo dado, já interseccionado com o
+// Frame. É o recorte do Rótulo: texto mais largo que a área que lhe coube é
+// cortado nela, e nunca vaza para a Superfície vizinha nem para o Chrome.
+func (c *Canvas) mascaraDaArea(x, y, l, a float64) *image.Alpha {
+	larg, alt := c.dc.Width(), c.dc.Height()
+	fx0, fy0, fx1, fy1 := c.retanguloDoFrame()
+	m := image.NewAlpha(image.Rect(0, 0, larg, alt))
+	r := image.Rect(
+		pixelSeguro(math.Max(x, fx0), larg), pixelSeguro(math.Max(y, fy0), alt),
+		pixelSeguro(math.Min(x+l, fx1), larg), pixelSeguro(math.Min(y+a, fy1), alt),
+	)
+	draw.Draw(m, r, image.NewUniform(color.Alpha{A: 0xFF}), image.Point{}, draw.Src)
+	return m
 }
 
 // tracaRetangulo traça o Retângulo já recortado ao Frame. O recorte é exato:

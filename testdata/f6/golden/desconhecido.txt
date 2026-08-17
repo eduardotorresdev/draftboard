@@ -1,0 +1,1 @@
+erro: desconhecido.yaml: frames[0].layers[0].elements[0]: nome de Controle desconhecido "slidder"; você quis dizer "slider"?

@@ -74,7 +74,7 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 	linhas := map[string]string{
 		"tabela do nó use (box obrigatório)":  "| `use: \"./comp.yaml\"` | caminho relativo | `box` (**obrigatório**), `slots`, `id`, `note`, `repeat` |",
 		"tabela do nó slot (box obrigatório)": "| `slot: \"nome\"` | nome do Slot | `box` (**obrigatório**), `default`, `id`, `note`, `repeat` |",
-		"lista de chaves discriminantes":      "Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use` ou `slot`.",
+		"lista de chaves discriminantes":      "Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use`, `slot` ou `control`.",
 		"regra de slot só em Componente":      "- `slot` só é válido dentro de Componente — nunca em Documento.",
 		"nó slot no exemplo de Componente":    "  - slot: \"body\"",
 		"tabela da flag --out":                "| `--out DIR` | `render` | `.` | diretório de saída |",
@@ -86,7 +86,15 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"nome de saída com --layers":          "| com `--layers` | `<doc>-<frame>-<nn>-<camada>.webp`, `nn` de dois dígitos a partir de `01` |",
 		"fórmula do Círculo no Frame":         "Círculo:  L = A = d/100*FL      (largura nos dois eixos — nunca vira elipse)",
 		"fórmula do Círculo no espaço local":  "Círculo:  L = A = d/100*bl",
-		"linha de Elemento do inspect":        "      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>]",
+		"linha de Elemento do inspect":        "      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>]",
+		"tabela do nó control":                "| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `repeat`, e os campos do Controle |",
+		"regra de Controle fechado":           "- `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.",
+		"catálogo do Controle button":         "| `button` | `label` | sem `label`, o rótulo vira barra cinza |",
+		"catálogo do Controle input":          "| `input` | `label` | sem `label`, o rótulo vira barra cinza |",
+		"catálogo do Controle tabs":           "| `tabs` | `items`, `active` | `items: 3`, `active: 1` |",
+		"catálogo do Controle slider":         "| `slider` | `value` | `value: 50` |",
+		"regra das duas formas de items":      "- `items` aceita **número** (itens sem texto) ou **lista de rótulos** (itens com texto).",
+		"regra da fonte derivada":             "- O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de",
 	}
 	for fato, linha := range linhas {
 		if !contemLinha(c, linha) {

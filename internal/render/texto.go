@@ -131,3 +131,42 @@ func metricas(f font.Face) (subida, altura float64) {
 	descida := float64(m.Descent) / 64
 	return subida, subida + descida
 }
+
+// fracaoDoRotulo é a altura da fonte do Rótulo como fração da altura da área
+// que a resolução lhe reservou. É constante de propósito: o tamanho do texto é
+// derivado da estrutura, nunca declarado, pela mesma razão que o Tom é.
+const fracaoDoRotulo = 0.45
+
+// desenhaRotulo pinta o Rótulo de um Elemento de Forma Texto dentro da área do
+// próprio Elemento, no espaço do Frame. As coordenadas chegam já em px de
+// dispositivo.
+//
+// A resolução entrega a área e o alinhamento, nunca a largura do texto: medir
+// glifos exige a fonte, e manter a fonte fora da resolução é o que impede o
+// freetype de virar dependência de quem só calcula geometria.
+func (c *Canvas) desenhaRotulo(e scene.Elemento, x, y, l, a float64) {
+	if e.Rotulo == "" {
+		return
+	}
+	tamanho := fracaoDoRotulo * e.A
+	if !finito(tamanho) || tamanho <= 0 || tamanho*c.escala > c.limiteDeTracado() {
+		return
+	}
+
+	f := c.face(tamanho)
+	subida, altura := metricas(f)
+
+	// A linha fica centralizada na vertical em qualquer alinhamento: só o eixo
+	// horizontal é escolha do Controle.
+	base := y + (a-altura)/2 + subida
+	inicio := x
+	if e.Alinhamento == scene.AoCentro {
+		inicio = x + (l-c.larguraDeDispositivo(f, e.Rotulo))/2
+	}
+
+	_ = c.dc.SetMask(c.mascaraDaArea(x, y, l, a))
+	c.dc.SetFontFace(f)
+	c.dc.SetColor(cor(e.Tom))
+	c.dc.DrawString(e.Rotulo, inicio, base)
+	c.dc.ResetClip()
+}

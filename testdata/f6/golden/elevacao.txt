@@ -1,0 +1,6 @@
+documento elevacao
+  frame escada 1000x500
+    camada base
+      painel retangulo 0,0 1000x500 tom=300 elev=1
+      botao retangulo 100,50 300x50 tom=500 elev=2 round controle=button rotulo="Ok"
+      sobre-o-rotulo retangulo 130,65 40x10 tom=700 elev=3

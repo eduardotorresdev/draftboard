@@ -1,0 +1,12 @@
+documento controles
+  frame catalogo 1280x800
+    camada conteudo
+      abas retangulo 51,32 1178x56 tom=300 elev=1 controle=tabs itens=[Perfil, Conta, Faturas, Ajuda] ativo=2
+        nota: Navegação principal
+      e1 retangulo 51,128 576x56 tom=300 elev=1 round controle=input rotulo="Buscar produtos"
+      e2 retangulo 666,128 563x56 tom=300 elev=1 round controle=input
+      e3 retangulo 51,240 576x32 tom=300 elev=1 round controle=slider valor=70
+      e4 retangulo 666,240 563x32 tom=300 elev=1 round controle=slider valor=0
+      e5 retangulo 51,320 230x56 tom=300 elev=1 round controle=button rotulo="Salvar"
+      e6 retangulo 320,320 230x56 tom=300 elev=1 round controle=button
+      e7 retangulo 51,416 576x48 tom=300 elev=1 controle=tabs itens=5 ativo=1

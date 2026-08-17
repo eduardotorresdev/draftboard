@@ -1,0 +1,1 @@
+erro: campo-de-outro.yaml: frames[0].layers[0].elements[0]: campo "value" não é permitido no Controle "button"

@@ -42,7 +42,13 @@ func executa(args ...string) (codigo int, stdout, stderr string) {
 // mensagens da CLI citem o Documento pelo nome, sem diretório.
 func naPastaDeFixtures(t *testing.T) {
 	t.Helper()
-	pasta, err := filepath.Abs(filepath.Join("testdata", "f1"))
+	naPasta(t, "f1")
+}
+
+// naPasta leva o teste para dentro da pasta de fixtures da funcionalidade.
+func naPasta(t *testing.T, funcionalidade string) {
+	t.Helper()
+	pasta, err := filepath.Abs(filepath.Join("testdata", funcionalidade))
 	if err != nil {
 		t.Fatalf("caminho das fixtures: %v", err)
 	}

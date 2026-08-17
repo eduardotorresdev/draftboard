@@ -96,7 +96,7 @@ O tipo é inferido pelo conteúdo: tem `frames` → **Documento**; senão → **
 
 ## Nós de elemento
 
-Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use` ou `slot`.
+Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use`, `slot` ou `control`.
 
 | Nó | Valor | Chaves adicionais permitidas |
 | --- | --- | --- |
@@ -104,13 +104,49 @@ Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use` ou `slot
 | `circle: {x, y, d}` | geometria em % | `id`, `note`, `repeat` |
 | `use: "./comp.yaml"` | caminho relativo | `box` (**obrigatório**), `slots`, `id`, `note`, `repeat` |
 | `slot: "nome"` | nome do Slot | `box` (**obrigatório**), `default`, `id`, `note`, `repeat` |
+| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `repeat`, e os campos do Controle |
 
 - `round: true` só existe em `rect`. Cantos retos é o padrão.
 - `slots` só existe em `use`. `default` (lista de nós) só existe em `slot`.
 - `slot` só é válido dentro de Componente — nunca em Documento.
+- `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.
 - `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); some inteira com `--notes off`.
 - `id` renomeia o segmento do Elemento no caminho da árvore.
 - Toda chave desconhecida, em qualquer nível, é erro com sugestão da chave próxima.
+
+## Controles
+
+O Controle é uma peça pronta do catálogo embutido: em vez de montar um botão com
+vários `rect`, você declara o que ele é e recebe o desenho inteiro. É **fechado** —
+não se abre, não recebe Slot, e no `inspect` ocupa **uma linha só**, com os
+parâmetros declarados. O que ele materializa por dentro não aparece na árvore.
+
+```yaml
+- control: tabs
+  box: {x: 4, y: 10, w: 92, h: 6}
+  items: ["Perfil", "Conta", "Faturas"]
+  active: 2
+- control: slider
+  box: {x: 4, y: 30, w: 40, h: 4}
+  value: 70
+- control: button
+  box: {x: 4, y: 40, w: 18, h: 7}
+  label: "Salvar"
+```
+
+| Controle | Campos | Padrão |
+| --- | --- | --- |
+| `button` | `label` | sem `label`, o rótulo vira barra cinza |
+| `input` | `label` | sem `label`, o rótulo vira barra cinza |
+| `tabs` | `items`, `active` | `items: 3`, `active: 1` |
+| `slider` | `value` | `value: 50` |
+
+- `items` aceita **número** (itens sem texto) ou **lista de rótulos** (itens com texto).
+- `active` é base 1; `active: 0` deixa nenhum item ativo.
+- `value` vai de 0 a 100.
+- O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de
+  fonte, de alinhamento nem de cor**, pela mesma razão que não existe campo de Tom.
+- Rótulo que não cabe é recortado na área do Controle.
 
 ## Geometria
 
@@ -202,7 +238,7 @@ Indentação de 2 espaços por nível; coordenadas arredondadas para inteiro.
 documento <nome>
   frame <nome> <L>x<A>
     camada <nome>
-      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>]
+      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>]
         nota: <texto>
 ```
 
@@ -227,6 +263,9 @@ de Componente.
 | profundidade de aninhamento maior que 16 |
 | `repeat.n` < 1, ou `axis` fora de {`x`, `y`} |
 | `slot` declarado em Documento |
+| nome de Controle fora do catálogo (a mensagem sugere o nome válido mais próximo) |
+| campo de Controle usado noutro nó, ou campo que aquele Controle não aceita |
+| `active` além da quantidade de itens, ou `value` fora de 0..100 |
 | `box` ausente em `use` ou `slot` |
 
 Formato: `erro: <arquivo>: <local>: <mensagem>`, onde `<local>` é o caminho de chaves YAML
@@ -246,7 +285,8 @@ erro: card.yaml: elements[0]: campo desconhecido "rond"; você quis dizer "round
 
 ## Receita
 
-1. Escreva o Documento; extraia em Componente o que se repete com variação de conteúdo.
+1. Escreva o Documento; use `control` para as peças de interface e extraia em
+   Componente o que se repete com variação de conteúdo.
 2. `draftboard validate home.yaml` — silêncio significa válido.
 3. `draftboard inspect home.yaml` — confira caminhos, geometria em px e a escada de Elevação.
 4. `draftboard render home.yaml --out ./out --scale 2` — gere as imagens.

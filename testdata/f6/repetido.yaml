@@ -1,0 +1,11 @@
+frames:
+  - name: t
+    w: 400
+    h: 200
+    layers:
+      - name: c
+        elements:
+          - control: button
+            box: {x: 5, y: 5, w: 40, h: 15}
+            label: "Ir"
+            repeat: {n: 3, axis: y, gap: 5}

@@ -84,14 +84,38 @@ const (
 	Retangulo Forma = iota
 	// Circulo é o Elemento redondo. Nunca vira elipse.
 	Circulo
+	// Texto é o Rótulo desenhado dentro de um Controle. É a única Forma que
+	// carrega conteúdo textual no plano do desenho, e só a resolução de um
+	// Controle a produz: não existe nó de Texto solto no YAML.
+	Texto
 )
 
+// String devolve o nome da Forma no vocabulário do domínio. É um switch, e não
+// um if com retorno padrão, porque um valor novo de Forma tem que quebrar aqui
+// de forma visível em vez de se disfarçar de Retângulo na árvore do inspect.
 func (f Forma) String() string {
-	if f == Circulo {
+	switch f {
+	case Circulo:
 		return "circulo"
+	case Texto:
+		return "texto"
+	default:
+		return "retangulo"
 	}
-	return "retangulo"
 }
+
+// Alinhamento diz onde o Rótulo se apoia dentro da área que lhe foi dada.
+// Existe porque a resolução não conhece métrica de fonte: ela entrega a área,
+// e só o rasterizador sabe a largura real da string.
+type Alinhamento int
+
+const (
+	// AoCentro centraliza o Rótulo nos dois eixos da área.
+	AoCentro Alinhamento = iota
+	// AEsquerda encosta o Rótulo na borda esquerda da área, centralizado só na
+	// vertical.
+	AEsquerda
+)
 
 // Elemento é uma forma posicionada num Frame, com geometria já resolvida em
 // pixels absolutos relativos ao canto superior esquerdo do Frame.
@@ -120,6 +144,25 @@ type Elemento struct {
 	Origem string
 	// Nota é a anotação textual aninhada no Elemento. Vazia quando não há.
 	Nota string
+	// Rotulo é o texto desenhado quando Forma é Texto. Vazio nas demais Formas.
+	// Diferente da Nota: o Rótulo vive no plano do desenho e participa da
+	// Elevação; a Nota vive no plano de anotação e não participa.
+	Rotulo string
+	// Controle é o nome de catálogo do Controle que materializou este Elemento,
+	// preenchido tanto na cabeça quanto nos Elementos internos. Vazio quando o
+	// Elemento não veio de um Controle.
+	Controle string
+	// Detalhe são os parâmetros do Controle já formatados para a árvore do
+	// inspect, no formato "itens=3 ativo=2". Só a cabeça do Controle o carrega,
+	// e fica vazio quando não há parâmetro que valha imprimir.
+	Detalhe string
+	// Interno marca as peças de dentro de um Controle, que existem no desenho
+	// mas não na árvore: o Controle é fechado também na leitura. A cabeça do
+	// Controle não é interna.
+	Interno bool
+	// Alinhamento posiciona o Rotulo dentro da área do Elemento. Só tem efeito
+	// quando Forma é Texto.
+	Alinhamento Alinhamento
 }
 
 // Camada é um grupo nomeado e ordenado de Elementos dentro de um Frame.

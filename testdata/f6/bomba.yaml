@@ -1,0 +1,11 @@
+frames:
+  - name: t
+    w: 1000
+    h: 1000
+    layers:
+      - name: c
+        elements:
+          - control: tabs
+            box: {x: 0, y: 0, w: 10, h: 2}
+            items: 20
+            repeat: {n: 1000, axis: y, gap: 0}

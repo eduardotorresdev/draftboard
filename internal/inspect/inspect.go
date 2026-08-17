@@ -20,6 +20,13 @@ func Arvore(w io.Writer, d *scene.Documento) error {
 		for _, c := range f.Camadas {
 			fmt.Fprintf(b, "    camada %s\n", c.Nome)
 			for _, e := range c.Elementos {
+				// O Controle é fechado também na leitura: a árvore mostra a
+				// sua cabeça e os parâmetros que o descrevem, e omite as peças
+				// que ele materializou. Quem escreveu `control:` não escreveu
+				// aquelas peças e não paga tokens para lê-las.
+				if e.Interno {
+					continue
+				}
 				fmt.Fprintf(b, "      %s\n", linhaDoElemento(e))
 				if e.Nota != "" {
 					fmt.Fprintf(b, "        nota: %s\n", e.Nota)
@@ -42,6 +49,12 @@ func linhaDoElemento(e scene.Elemento) string {
 	}
 	if e.Origem != "" {
 		linha += " de=" + e.Origem
+	}
+	if e.Controle != "" {
+		linha += " controle=" + e.Controle
+	}
+	if e.Detalhe != "" {
+		linha += " " + e.Detalhe
 	}
 	return linha
 }

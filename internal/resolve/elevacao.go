@@ -48,7 +48,15 @@ func maiorElevacao(c scene.Camada) int {
 
 // contemGeometricamente diz se a bounding box declarada de superficie contém a
 // de elemento. A contenção é inclusiva: bordas coincidentes contam.
+//
+// Um Elemento de Forma Texto nunca é Superfície: o Rótulo é tinta sobre a
+// Superfície que o sustenta, não uma Superfície nova. Sem esta regra, qualquer
+// Elemento desenhado por cima de um Rótulo ganharia um degrau de Elevação — e
+// portanto um Tom mais escuro — só por passar em cima de um texto.
 func contemGeometricamente(superficie, elemento *scene.Elemento) bool {
+	if superficie.Forma == scene.Texto {
+		return false
+	}
 	return superficie.X <= elemento.X &&
 		superficie.Y <= elemento.Y &&
 		superficie.X+superficie.L >= elemento.X+elemento.L &&

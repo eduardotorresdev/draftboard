@@ -1,0 +1,5 @@
+documento usa-componente
+  frame t 800x400
+    camada c
+      form/e0 retangulo 80,40 320x80 tom=300 elev=1 round de=no-componente.yaml controle=input rotulo="Nome"
+      form/e1 retangulo 80,160 320x80 tom=300 elev=1 round de=no-componente.yaml controle=button rotulo="Enviar"

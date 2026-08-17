@@ -1,0 +1,6 @@
+documento repetido
+  frame t 400x200
+    camada c
+      e0#0 retangulo 20,10 160x30 tom=300 elev=1 round controle=button rotulo="Ir"
+      e0#1 retangulo 20,50 160x30 tom=300 elev=1 round controle=button rotulo="Ir"
+      e0#2 retangulo 20,90 160x30 tom=300 elev=1 round controle=button rotulo="Ir"

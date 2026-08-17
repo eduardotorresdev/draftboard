@@ -6,6 +6,8 @@
 // o arquivo e a localização em caminho de chaves YAML.
 package schema
 
+import "github.com/eduardotorresdev/draftboard/internal/controls"
+
 // Documento é um arquivo YAML que declara Frames. É a unidade que se renderiza.
 type Documento struct {
 	// Arquivo é o caminho do arquivo de onde o Documento foi lido.
@@ -53,6 +55,8 @@ const (
 	TipoInstancia
 	// TipoSlot é o nó `slot`: a declaração de um Slot num Componente.
 	TipoSlot
+	// TipoControle é o nó `control`: o uso de um Controle do catálogo embutido.
+	TipoControle
 )
 
 func (t Tipo) String() string {
@@ -63,6 +67,8 @@ func (t Tipo) String() string {
 		return "Instância"
 	case TipoSlot:
 		return "Slot"
+	case TipoControle:
+		return "Controle"
 	default:
 		return "Retângulo"
 	}
@@ -136,4 +142,7 @@ type No struct {
 	OrdemDosPreenchimentos []string
 	// Padrao é o conteúdo padrão de um nó TipoSlot, ou nil quando ausente.
 	Padrao []No
+	// Controle são os parâmetros do Controle quando Tipo é TipoControle, já
+	// validados contra o catálogo e com os padrões preenchidos.
+	Controle *controls.Parametros
 }

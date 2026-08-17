@@ -24,8 +24,8 @@ que está abaixo dela.
 _Avoid_: layer, grupo, z-index
 
 **Elemento**:
-Forma posicionada num Frame. Existem dois tipos: Retângulo e Círculo. Toda forma
-é sólida — não existe contorno.
+Forma posicionada num Frame. Existem três tipos: Retângulo, Círculo e Rótulo.
+Retângulo e Círculo são sólidos — não existe contorno.
 _Avoid_: shape, node, objeto, widget
 
 **Retângulo**:
@@ -84,3 +84,16 @@ _Avoid_: buraco, placeholder, children, hole
 **Repetição**:
 Clonagem de um Elemento ou Instância ao longo de um eixo, com espaçamento fixo.
 _Avoid_: loop, array, list, repeat
+
+**Controle**:
+Elemento composto do catálogo embutido no binário, invocado por nome em vez de
+por arquivo. É fechado: não recebe Slot nem conteúdo, e a árvore mostra só a sua
+cabeça e os parâmetros declarados. Materializa-se em vários Elementos antes da
+Elevação e, como Instância e Repetição, não existe mais no Documento resolvido.
+_Avoid_: widget, componente nativo, primitiva, bloco
+
+**Rótulo**:
+Texto desenhado dentro de um Controle. Distingue-se da Nota por estar no plano
+do desenho: participa da Elevação e aparece no export por Camada. Não é
+Superfície — nada se apoia sobre ele.
+_Avoid_: label, caption, legenda, texto

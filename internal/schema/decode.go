@@ -12,6 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/eduardotorresdev/draftboard/internal/controls"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 )
 
@@ -21,13 +22,18 @@ var (
 	chavesDoComponente    = []string{"elements"}
 	chavesDoFrame         = []string{"name", "w", "h", "layers"}
 	chavesDaCamada        = []string{"name", "elements"}
-	chavesDoNo            = []string{"rect", "circle", "use", "slot", "round", "id", "note", "repeat", "box", "slots", "default"}
+	chavesDoNo            = []string{"rect", "circle", "use", "slot", "control", "round", "id", "note", "repeat", "box", "slots", "default", "label", "items", "active", "value"}
 	chavesDaCaixa         = []string{"x", "y", "w", "h"}
 	chavesDoDisco         = []string{"x", "y", "d"}
 	chavesDaRepeticao     = []string{"n", "axis", "gap"}
 	chavesDoPreenchimento = []string{"use", "elements"}
 
-	discriminantes = []string{"rect", "circle", "use", "slot"}
+	discriminantes = []string{"rect", "circle", "use", "slot", "control"}
+
+	// chavesDeControle são todos os campos que algum Controle do catálogo
+	// aceita. Estão em chavesDoNo para que a sugestão de chave próxima os
+	// conheça, e a permissão real é conferida contra o Controle declarado.
+	chavesDeControle = []string{"label", "items", "active", "value"}
 )
 
 // LeDocumento lê e decodifica o arquivo YAML no caminho dado como Documento. O
@@ -237,7 +243,7 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 	}
 	switch len(achadas) {
 	case 0:
-		return No{}, l.erro(local, `nó de elemento sem chave discriminante; declare "rect", "circle", "use" ou "slot"`)
+		return No{}, l.erro(local, `nó de elemento sem chave discriminante; declare "rect", "circle", "use", "slot" ou "control"`)
 	case 1:
 	default:
 		return No{}, l.erro(local, "mais de uma chave discriminante no mesmo nó de elemento: %s", strings.Join(achadas, ", "))
@@ -266,6 +272,11 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 		}
 		if no.Componente == "" {
 			return No{}, l.erro(local, `Instância sem caminho de Componente em "use"`)
+		}
+	case m.valores["control"] != nil:
+		no.Tipo = TipoControle
+		if no.Controle, err = l.controle(m, local); err != nil {
+			return No{}, err
 		}
 	default:
 		no.Tipo = TipoSlot
@@ -296,10 +307,10 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 		}
 	}
 
-	precisaDeCaixa := no.Tipo == TipoInstancia || no.Tipo == TipoSlot
+	precisaDeCaixa := no.Tipo == TipoInstancia || no.Tipo == TipoSlot || no.Tipo == TipoControle
 	if m.valores["box"] != nil {
 		if !precisaDeCaixa {
-			return No{}, l.erro(local, `campo "box" só é permitido em Instância ou Slot`)
+			return No{}, l.erro(local, `campo "box" só é permitido em Instância, Slot ou Controle`)
 		}
 		c, err := l.caixa(m.valores["box"], local+".box")
 		if err != nil {
@@ -325,6 +336,14 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 		}
 		if no.Padrao, err = l.nos(m.valores["default"], local, "default"); err != nil {
 			return No{}, err
+		}
+	}
+
+	if no.Tipo != TipoControle {
+		for _, campo := range chavesDeControle {
+			if m.valores[campo] != nil {
+				return No{}, l.erro(local, `campo %q só é permitido em Controle`, campo)
+			}
 		}
 	}
 
@@ -604,4 +623,131 @@ func nomeDoTipo(n *yaml.Node) string {
 		return "texto"
 	}
 	return "valor desconhecido"
+}
+
+// controle lê o nó de um Controle: resolve o nome contra o catálogo embutido,
+// aceita só os campos daquele Controle e devolve os parâmetros já com os
+// padrões preenchidos e validados.
+//
+// A permissão por campo é conferida aqui, e não pela tabela de chaves do nó,
+// porque `label` é legítimo num `button` e ilegítimo num `slider`: é o Controle
+// declarado que decide, não o nível.
+func (l *leitor) controle(m *mapaLido, local string) (*controls.Parametros, error) {
+	nome, err := l.texto(m, "control")
+	if err != nil {
+		return nil, err
+	}
+	if nome == "" {
+		return nil, l.erro(local, `Controle sem nome em "control"`)
+	}
+	def, ok := controls.Definido(nome)
+	if !ok {
+		if s := sugestao(nome, controls.Nomes()); s != "" {
+			return nil, l.erro(local, "nome de Controle desconhecido %q; você quis dizer %q?", nome, s)
+		}
+		return nil, l.erro(local, "nome de Controle desconhecido %q", nome)
+	}
+
+	p := controls.Parametros{
+		Nome:    nome,
+		Quantos: controls.Ausente,
+		Ativo:   controls.Ausente,
+		Valor:   controls.Ausente,
+	}
+	for _, campo := range chavesDeControle {
+		if m.valores[campo] == nil {
+			continue
+		}
+		if !aceita(def.Chaves, campo) {
+			return nil, l.erro(local, "campo %q não é permitido no Controle %q", campo, nome)
+		}
+		switch campo {
+		case "label":
+			if p.Rotulo, err = l.texto(m, "label"); err != nil {
+				return nil, err
+			}
+		case "items":
+			if err := l.itens(m.valores["items"], m, local, &p); err != nil {
+				return nil, err
+			}
+		case "active":
+			if p.Ativo, err = l.inteiro(m, "active", 0, controls.LimiteDeItens); err != nil {
+				return nil, err
+			}
+		case "value":
+			if p.Valor, err = l.fracao(m, "value"); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	def.Padroes(&p)
+	if msg := def.Valida(p); msg != "" {
+		return nil, l.erro(local, "%s", msg)
+	}
+	return &p, nil
+}
+
+// itens lê o campo "items", que aceita duas formas: um número, que gera itens
+// sem texto, ou uma lista de rótulos, que gera itens com Rótulo. As duas formas
+// existem para o autor escolher quanto token gastar descrevendo o Controle.
+func (l *leitor) itens(n *yaml.Node, m *mapaLido, local string, p *controls.Parametros) error {
+	switch n.Kind {
+	case yaml.SequenceNode:
+		p.Itens = make([]string, 0, len(n.Content))
+		for i, filho := range n.Content {
+			if filho.Kind != yaml.ScalarNode {
+				return l.erro(fmt.Sprintf("%s.items[%d]", local, i),
+					"item do Controle espera texto, encontrou %s", nomeDoTipo(filho))
+			}
+			p.Itens = append(p.Itens, filho.Value)
+		}
+		p.Quantos = len(p.Itens)
+		return nil
+	case yaml.ScalarNode:
+		quantos, err := l.inteiro(m, "items", 0, controls.LimiteDeItens)
+		if err != nil {
+			return err
+		}
+		p.Quantos = quantos
+		return nil
+	default:
+		return l.erro(local, `campo "items" espera número ou sequência, encontrou %s`, nomeDoTipo(n))
+	}
+}
+
+// inteiro lê um campo numérico que só aceita inteiro dentro de uma faixa.
+func (l *leitor) inteiro(m *mapaLido, campo string, minimo, maximo int) (int, error) {
+	v, err := l.numero(m, campo)
+	if err != nil {
+		return 0, err
+	}
+	if v != float64(int(v)) || v < float64(minimo) || v > float64(maximo) {
+		return 0, l.erro(m.local, "campo %q do Controle deve ser um inteiro entre %d e %d, encontrou %s",
+			campo, minimo, maximo, strconv.FormatFloat(v, 'g', -1, 64))
+	}
+	return int(v), nil
+}
+
+// fracao lê um campo numérico de 0 a 100.
+func (l *leitor) fracao(m *mapaLido, campo string) (float64, error) {
+	v, err := l.numero(m, campo)
+	if err != nil {
+		return 0, err
+	}
+	if v < 0 || v > 100 {
+		return 0, l.erro(m.local, "campo %q do Controle deve estar entre 0 e 100, encontrou %s",
+			campo, strconv.FormatFloat(v, 'g', -1, 64))
+	}
+	return v, nil
+}
+
+// aceita diz se o campo está entre as chaves de um Controle.
+func aceita(chaves []string, campo string) bool {
+	for _, c := range chaves {
+		if c == campo {
+			return true
+		}
+	}
+	return false
 }

@@ -1,0 +1,7 @@
+elements:
+  - control: input
+    box: {x: 0, y: 0, w: 100, h: 40}
+    label: "Nome"
+  - control: button
+    box: {x: 0, y: 60, w: 100, h: 40}
+    label: "Enviar"

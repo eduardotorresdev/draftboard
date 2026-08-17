@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/eduardotorresdev/draftboard/internal/controls"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 	"github.com/eduardotorresdev/draftboard/internal/schema"
 )
@@ -185,8 +186,15 @@ func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminh
 		return nil
 	case schema.TipoSlot:
 		return r.slot(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
-	default:
+	case schema.TipoControle:
+		return r.controle(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
+	case schema.TipoInstancia:
 		return r.instancia(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
+	default:
+		// Cada Tipo tem seu caso explícito de propósito. Um Tipo novo que
+		// caísse num ramo padrão pensado para outro Tipo dereferenciaria o
+		// ponteiro errado e entraria em pânico, onde o contrato manda erro.
+		return r.erro(ctx.prefixo+no.Local, "tipo de nó não suportado na resolução: %s", no.Tipo)
 	}
 }
 
@@ -356,8 +364,8 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 	if l <= 0 || a <= 0 {
 		r.aviso(local, "Elemento de área zero: não aparecerá no desenho")
 	}
-	*dest = append(*dest, scene.Elemento{
-		Caminho:     r.caminhoUnico(caminho),
+	r.emite(dest, scene.Elemento{
+		Caminho:     caminho,
 		ID:          no.ID,
 		Forma:       forma,
 		X:           x,
@@ -368,6 +376,14 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		Origem:      ctx.origem,
 		Nota:        no.Nota,
 	})
+}
+
+// emite acrescenta um Elemento já montado, desambiguando o caminho. Existe para
+// que o Retângulo, o Círculo e cada peça de um Controle nasçam pelo mesmo lugar
+// e portanto compartilhem a regra de unicidade de caminho.
+func (r *resolucao) emite(dest *[]scene.Elemento, e scene.Elemento) {
+	e.Caminho = r.caminhoUnico(e.Caminho)
+	*dest = append(*dest, e)
 }
 
 // caminhoUnico garante que dois Elementos do mesmo Frame nunca compartilhem o
@@ -406,7 +422,7 @@ func tamanhoNoEixo(no schema.No, eixo string) float64 {
 			return no.Retangulo.L
 		}
 		return no.Retangulo.A
-	case schema.TipoInstancia, schema.TipoSlot:
+	case schema.TipoInstancia, schema.TipoSlot, schema.TipoControle:
 		if eixo == "x" {
 			return no.Caixa.L
 		}
@@ -435,4 +451,69 @@ func junta(prefixo, seg string) string {
 		return seg
 	}
 	return prefixo + "/" + seg
+}
+
+// controle materializa um Controle do catálogo embutido na caixa que ele
+// declarou. A primeira peça do layout é a cabeça: ela herda o id, a Nota e o
+// caminho do nó, e é a única que aparece na árvore do inspect. As demais são
+// internas, ganham um segmento próprio no caminho e nunca carregam Nota — se
+// carregassem, o plano de anotação anotaria o mesmo Controle várias vezes.
+func (r *resolucao) controle(no schema.No, esp espaco, caixa schema.Caixa, caminho string, ctx contexto, dest *[]scene.Elemento) error {
+	def, ok := controls.Definido(no.Controle.Nome)
+	if !ok {
+		// Inalcançável pela decodificação, que já resolveu o nome contra o
+		// catálogo. Fica como erro, e não pânico, porque o contrato manda
+		// código 1 para tudo que impede a resolução.
+		return r.erro(ctx.prefixo+no.Local, "Controle desconhecido %q", no.Controle.Nome)
+	}
+
+	x, y, l, a := esp.retangulo(caixa)
+	local := ctx.prefixo + no.Local
+	for i, peca := range def.Layout(*no.Controle, x, y, l, a) {
+		// A cabeça já foi debitada pelo clone que trouxe o nó até aqui; cada
+		// peça interna é uma materialização a mais e é cobrada do orçamento do
+		// Frame, senão o teto de Elementos viraria ficção num Controle que
+		// materializa dezenas de peças por nó.
+		if i > 0 {
+			if err := r.debita(1, local); err != nil {
+				return err
+			}
+		}
+		e := scene.Elemento{
+			Caminho:     caminhoDaPeca(caminho, peca.Segmento),
+			Forma:       peca.Forma,
+			X:           peca.X,
+			Y:           peca.Y,
+			L:           peca.L,
+			A:           peca.A,
+			Arredondado: peca.Arredondado,
+			Origem:      ctx.origem,
+			Rotulo:      peca.Rotulo,
+			Alinhamento: peca.Alinhamento,
+			Controle:    no.Controle.Nome,
+			Interno:     i > 0,
+		}
+		if i == 0 {
+			e.ID = no.ID
+			e.Nota = no.Nota
+			e.Detalhe = def.Detalhe(*no.Controle)
+		}
+		if e.X < 0 || e.Y < 0 || e.X+e.L > r.frameL || e.Y+e.A > r.frameA {
+			r.aviso(local, "Elemento fora do Frame: será recortado na borda")
+		}
+		if e.L <= 0 || e.A <= 0 {
+			r.aviso(local, "Elemento de área zero: não aparecerá no desenho")
+		}
+		r.emite(dest, e)
+	}
+	return nil
+}
+
+// caminhoDaPeca acrescenta o segmento de uma peça interna ao caminho do
+// Controle. A cabeça tem segmento vazio e fica com o caminho do próprio nó.
+func caminhoDaPeca(caminho, segmento string) string {
+	if segmento == "" {
+		return caminho
+	}
+	return caminho + "/" + segmento
 }

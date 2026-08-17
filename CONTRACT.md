@@ -17,6 +17,7 @@ Dono de cada diretório (ninguém escreve fora do seu):
 | Diretório | Dono |
 | --- | --- |
 | `internal/scene/` | **orquestrador — congelado, ninguém edita** |
+| `internal/controls/` | catálogo de Controles |
 | `internal/schema/`, `internal/resolve/`, `internal/inspect/` | F1, depois F2 |
 | `internal/render/` | F3 |
 | `internal/notes/` | F4 |
@@ -35,7 +36,8 @@ const TomChrome Tom = 900       // extremo reservado ao Chrome
 func TomDaElevacao(elevacao int) Tom
 func (t Tom) Cinza() uint8
 
-type Forma int; const (Retangulo Forma = iota; Circulo)
+type Forma int; const (Retangulo Forma = iota; Circulo; Texto)
+type Alinhamento int; const (AoCentro Alinhamento = iota; AEsquerda)
 
 type Elemento struct {
     Caminho     string   // caminho estável na árvore; último segmento = id se houver
@@ -47,6 +49,11 @@ type Elemento struct {
     Tom         Tom
     Origem      string   // caminho relativo do Componente de origem; "" se inline
     Nota        string   // "" se não há
+    Rotulo      string   // texto do Elemento de Forma Texto; "" nas demais Formas
+    Controle    string   // nome de catálogo do Controle de origem; "" se não veio de um
+    Detalhe     string   // parâmetros do Controle formatados para o inspect; só na cabeça
+    Interno     bool     // peça de dentro de um Controle: existe no desenho, não na árvore
+    Alinhamento Alinhamento // posição do Rotulo na sua área; só vale em Forma Texto
 }
 type Camada struct { Nome string; Elementos []Elemento }
 type Frame struct { Nome string; L, A int; Camadas []Camada }
@@ -54,7 +61,15 @@ type Documento struct { Nome string; Frames []Frame }
 type Aviso struct { Arquivo, Local, Msg string }
 ```
 
-`scene.Documento` é achatado: Instâncias, Slots e Repetições **já não existem** nele.
+`scene.Documento` é achatado: Instâncias, Slots, Repetições e Controles **já não
+existem** nele — o Controle deixou os Elementos que materializou.
+
+**Adendo 1c (Forma Texto).** A Forma `Texto` é produzida apenas pela resolução de um
+Controle; não há nó de texto no YAML. `X, Y, L, A` são a **área reservada** ao Rótulo,
+nunca a caixa das glifas: medir texto exige a fonte, e a fonte não entra na resolução.
+`Forma.String()` devolve `retangulo`, `circulo` ou `texto`, por `switch` — Forma nova
+não pode se disfarçar de Retângulo na árvore. Ver
+`docs/adr/0001-rotulo-de-controle-desenha-texto-no-frame.md`.
 
 ### 1b. Entrada da resolução (dono F1)
 
@@ -135,6 +150,46 @@ Clone `i` desloca `i * (tamanho + gap)` no eixo, onde `tamanho` é `w`/`h` do re
 `d` do círculo, ou `box.w`/`box.h` da Instância — tudo em unidades do espaço local,
 antes da conversão para px. Repetição materializa clones no achatamento.
 
+### 2c. Controles (adendo, congelado)
+
+O nó `control` é a quinta chave discriminante. Ele é **fechado**: recusa
+`round`, `slots` e `default`, exige `box`, e aceita `id`, `note` e `repeat` como
+qualquer outro nó.
+
+Os campos de Controle (`label`, `items`, `active`, `value`) são chaves válidas
+de nó para efeito de sugestão, e a permissão real é conferida contra o Controle
+declarado: `label` é legítimo num `button` e ilegítimo num `slider`.
+
+| Controle | Campos | Padrões |
+| --- | --- | --- |
+| `button` | `label` | — |
+| `input` | `label` | — |
+| `tabs` | `items`, `active` | `items: 3`, `active: 1` |
+| `slider` | `value` | `value: 50` |
+
+`items` aceita número ou lista de rótulos; `active` é base 1 e admite 0 para
+nenhum ativo; `value` vai de 0 a 100. O teto de itens de um Controle é
+`controls.LimiteDeItens = 1_000`, pela mesma razão do teto de clones.
+
+O catálogo vive em `internal/controls/` e é o único lugar que conhece o desenho
+interno de um Controle. Acrescentar um Controle é acrescentar uma `Definicao`
+ali; `schema`, `resolve`, `render` e `inspect` não têm caso por Controle.
+
+A primeira peça do layout é a **cabeça**: ocupa a `box` declarada, herda `id` e
+`note` do nó, e é a única que aparece na árvore. As demais são internas
+(`Interno = true`), nunca carregam Nota, e cada uma é debitada do orçamento do
+Frame — o teto do §8b conta Elementos materializados, e um Controle materializa
+vários por nó.
+
+O Rótulo é um Elemento de Forma `Texto`, cuja geometria é a **área** reservada
+ao texto, não a caixa das glifas: a resolução não conhece métrica de fonte. O
+tamanho da fonte é `0,45` da altura da área, derivado na rasterização. O Rótulo
+**nunca é Superfície** para efeito de Elevação (§3). Texto que não cabe é
+recortado na área.
+
+A justificativa da revogação parcial do `docs/PRD.md` neste ponto está em
+`docs/adr/0001-rotulo-de-controle-desenha-texto-no-frame.md`.
+
 ## 3. Elevação e Tom (congelado, dono F1)
 
 Após o achatamento, para cada Frame, em ordem de pintura (Camadas na ordem declarada,
@@ -149,6 +204,10 @@ Elementos na ordem declarada dentro da Camada):
 
 Elemento recortado pela borda usa a bounding box **declarada** (não recortada) na contenção.
 
+Um Elemento de Forma `Texto` **nunca é pai**: o Rótulo é tinta sobre a Superfície que o
+sustenta, não uma Superfície nova. Sem essa regra, qualquer Elemento desenhado por cima
+de um Rótulo ganharia um degrau de Elevação só por passar em cima de um texto.
+
 ## 4. `inspect` — formato de árvore (congelado, dono F1)
 
 Indentação de 2 espaços por nível. Coordenadas arredondadas para inteiro (`math.Round`).
@@ -157,7 +216,7 @@ Indentação de 2 espaços por nível. Coordenadas arredondadas para inteiro (`m
 documento <nome>
   frame <nome> <L>x<A>
     camada <nome>
-      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>]
+      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome>[ <parâmetros>]]
         nota: <texto>
 ```
 
@@ -172,6 +231,12 @@ sufixo `#<indice>`, com o índice começando em `0` e emitido **sempre**, inclus
 informação que o desempate do §8c não carrega. Exemplo: `e1#0`, `e1#1`, `grade#2/e0`.
 Os dois mecanismos coexistem e se aplicam nesta ordem: primeiro `#<indice>`, depois, se o
 caminho resultante ainda colidir, o `~2`/`~3` do §8c.
+
+**Adendo 4c (Controle opaco).** Elemento com `Interno` verdadeiro **não é impresso**: o
+Controle mostra a cabeça e os parâmetros, e omite as peças que materializou. As peças
+continuam existindo na cena, no desenho e no orçamento — a opacidade é só da árvore. Os
+seus caminhos seguem as mesmas regras (`<caminho-do-controle>/<segmento>`) e continuam
+passando pela unicidade do §8c.
 
 `de=` aparece só quando `Origem != ""`.
 
