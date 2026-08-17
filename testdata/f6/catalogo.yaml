@@ -1,0 +1,52 @@
+frames:
+  - name: catalogo
+    w: 1280
+    h: 900
+    layers:
+      - name: conteudo
+        elements:
+          - control: checkbox
+            box: {x: 4, y: 4, w: 40, h: 5}
+            label: "Aceito os termos"
+            active: 1
+          - control: checkbox
+            box: {x: 4, y: 11, w: 40, h: 5}
+            label: "Receber novidades"
+          - control: toggle
+            box: {x: 52, y: 4, w: 12, h: 5}
+            active: 1
+          - control: toggle
+            box: {x: 52, y: 11, w: 12, h: 5}
+          - control: radio
+            box: {x: 4, y: 20, w: 40, h: 18}
+            items: ["Mensal", "Anual", "Vitalício"]
+            active: 2
+          - control: radio
+            box: {x: 52, y: 20, w: 40, h: 18}
+            items: 3
+            active: 0
+          - control: dropdown
+            box: {x: 4, y: 42, w: 40, h: 6}
+            label: "São Paulo"
+          - control: dropdown
+            box: {x: 52, y: 42, w: 40, h: 6}
+          - control: avatar
+            box: {x: 4, y: 52, w: 8, h: 11}
+            label: "ET"
+          - control: avatar
+            box: {x: 16, y: 52, w: 8, h: 11}
+          - control: badge
+            box: {x: 30, y: 55, w: 14, h: 5}
+            label: "Novo"
+          - control: badge
+            box: {x: 46, y: 55, w: 10, h: 5}
+          - control: progress
+            box: {x: 4, y: 68, w: 40, h: 3}
+            value: 35
+          - control: progress
+            box: {x: 52, y: 68, w: 40, h: 3}
+            value: 0
+          - control: accordion
+            box: {x: 4, y: 76, w: 92, h: 20}
+            items: ["Entrega", "Pagamento", "Devolução"]
+            active: 2

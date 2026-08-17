@@ -1,0 +1,12 @@
+frames:
+  - name: estados
+    w: 400
+    h: 200
+    layers:
+      - name: c
+        elements:
+          - control: toggle
+            box: {x: 10, y: 20, w: 30, h: 20}
+            active: 1
+          - control: toggle
+            box: {x: 10, y: 60, w: 30, h: 20}

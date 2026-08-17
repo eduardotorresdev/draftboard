@@ -194,6 +194,36 @@ recortado na área.
 A justificativa da revogação parcial do `docs/PRD.md` neste ponto está em
 `docs/adr/0001-rotulo-de-controle-desenha-texto-no-frame.md`.
 
+### Adendo 2d (catálogo da fatia 2, congelado)
+
+O catálogo cresce para doze Controles. Nenhum campo novo entrou: os oito abaixo
+cabem em `label`, `items`, `active` e `value`, e é isso que prova que a fronteira
+do §2c está no lugar certo — acrescentar Controle não tocou em `schema`,
+`resolve`, `render`, `inspect` nem na CLI.
+
+| Controle | Campos | Padrões |
+| --- | --- | --- |
+| `checkbox` | `label`, `active` | `active: 0` |
+| `radio` | `items`, `active` | `items: 3`, `active: 1` |
+| `toggle` | `active` | `active: 0` |
+| `accordion` | `items`, `active` | `items: 3`, `active: 1` |
+| `dropdown` | `label` | — |
+| `avatar` | `label` | — |
+| `badge` | `label` | — |
+| `progress` | `value` | `value: 50` |
+
+Nos Controles de dois estados — `checkbox` e `toggle` — `active` só aceita 0 ou
+1, e qualquer outro valor é erro: quem escreve 2 ali quase sempre achou que era
+uma lista.
+
+A cabeça do `avatar` é a única de Forma `Círculo`. Ela continua ocupando a `box`
+declarada, como manda o §2c; a rasterização é que inscreve o Círculo no menor
+lado da caixa.
+
+Um Controle nunca materializa peça de área zero: `progress` em 0 é o trilho
+vazio, e não um preenchimento de largura nula. O aviso de área zero do §6 é para
+o que o autor escreveu, nunca para o que o catálogo desenhou por ele.
+
 ## 3. Elevação e Tom (congelado, dono F1)
 
 Após o achatamento, para cada Frame, em ordem de pintura (Camadas na ordem declarada,

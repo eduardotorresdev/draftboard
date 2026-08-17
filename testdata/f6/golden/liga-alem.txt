@@ -1,0 +1,1 @@
+erro: liga-alem.yaml: frames[0].layers[0].elements[0]: campo "active" do Controle só aceita 0 ou 1, encontrou 2

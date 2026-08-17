@@ -140,9 +140,18 @@ parâmetros declarados. O que ele materializa por dentro não aparece na árvore
 | `input` | `label` | sem `label`, o rótulo vira barra cinza |
 | `tabs` | `items`, `active` | `items: 3`, `active: 1` |
 | `slider` | `value` | `value: 50` |
+| `checkbox` | `label`, `active` | `active: 0` (desmarcado) |
+| `radio` | `items`, `active` | `items: 3`, `active: 1` |
+| `toggle` | `active` | `active: 0` (desligado) |
+| `accordion` | `items`, `active` | `items: 3`, `active: 1`; a seção ativa abre |
+| `dropdown` | `label` | sem `label`, o rótulo vira barra cinza |
+| `avatar` | `label` | sem `label`, é só o disco |
+| `badge` | `label` | sem `label`, o rótulo vira barra cinza |
+| `progress` | `value` | `value: 50` |
 
 - `items` aceita **número** (itens sem texto) ou **lista de rótulos** (itens com texto).
 - `active` é base 1; `active: 0` deixa nenhum item ativo.
+- Em `checkbox` e `toggle`, `active` só aceita 0 ou 1: eles têm dois estados, não lista.
 - `value` vai de 0 a 100.
 - O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de
   fonte, de alinhamento nem de cor**, pela mesma razão que não existe campo de Tom.

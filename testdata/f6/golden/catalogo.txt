@@ -1,0 +1,18 @@
+documento catalogo
+  frame catalogo 1280x900
+    camada conteudo
+      e0 retangulo 51,36 512x45 tom=300 elev=1 controle=checkbox rotulo="Aceito os termos" ativo=1
+      e1 retangulo 51,99 512x45 tom=300 elev=1 controle=checkbox rotulo="Receber novidades" ativo=0
+      e2 retangulo 666,36 154x45 tom=300 elev=1 round controle=toggle ativo=1
+      e3 retangulo 666,99 154x45 tom=300 elev=1 round controle=toggle ativo=0
+      e4 retangulo 51,180 512x162 tom=300 elev=1 controle=radio itens=[Mensal, Anual, Vitalício] ativo=2
+      e5 retangulo 666,180 512x162 tom=300 elev=1 controle=radio itens=3 ativo=0
+      e6 retangulo 51,378 512x54 tom=300 elev=1 round controle=dropdown rotulo="São Paulo"
+      e7 retangulo 666,378 512x54 tom=300 elev=1 round controle=dropdown
+      e8 circulo 51,468 102x99 tom=300 elev=1 controle=avatar rotulo="ET"
+      e9 circulo 205,468 102x99 tom=300 elev=1 controle=avatar
+      e10 retangulo 384,495 179x45 tom=300 elev=1 round controle=badge rotulo="Novo"
+      e11 retangulo 589,495 128x45 tom=300 elev=1 round controle=badge
+      e12 retangulo 51,612 512x27 tom=300 elev=1 round controle=progress valor=35
+      e13 retangulo 666,612 512x27 tom=300 elev=1 round controle=progress valor=0
+      e14 retangulo 51,684 1178x180 tom=300 elev=1 controle=accordion itens=[Entrega, Pagamento, Devolução] ativo=2

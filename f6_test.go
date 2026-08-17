@@ -1,9 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"image"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/image/webp"
 )
 
 // naPastaDeControles leva o teste para dentro de testdata/f6, para que as
@@ -119,6 +125,56 @@ func TestControleCobraOOrcamento(t *testing.T) {
 	}
 }
 
+// TestCatalogoCompletoEhOpaco estende a prova de opacidade aos Controles da
+// fatia 2: quinze Controles declarados, quinze linhas de Elemento, por mais
+// peças que cada um materialize por dentro. O accordion aberto sozinho
+// materializa mais de dez.
+func TestCatalogoCompletoEhOpaco(t *testing.T) {
+	naPastaDeControles(t)
+
+	codigo, saida, erros := executa("inspect", "catalogo.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	conferaGolden(t, "catalogo.txt", saida)
+
+	elementos := 0
+	for _, linha := range strings.Split(saida, "\n") {
+		if strings.Contains(linha, "tom=") {
+			elementos++
+		}
+	}
+	if elementos != 15 {
+		t.Errorf("linhas de Elemento = %d, quer 15 (uma por Controle declarado)", elementos)
+	}
+}
+
+// TestCatalogoNaoAvisa prova que nenhum Controle do catálogo materializa peça
+// fora do Frame nem de área zero nos casos de borda — `progress` em 0 e
+// `radio` sem item ativo. Um aviso aqui seria o catálogo culpando o autor por
+// um desenho que ele não escreveu.
+func TestCatalogoNaoAvisa(t *testing.T) {
+	naPastaDeControles(t)
+
+	_, _, erros := executa("validate", "catalogo.yaml")
+	if erros != "" {
+		t.Errorf("stderr = %q, queria vazio", erros)
+	}
+}
+
+// TestControleDaFatia2NaoMudouOsOutros prova que acrescentar Controle é só
+// acrescentar entrada de catálogo: o desenho dos quatro primeiros continua
+// idêntico ao golden que a fatia 1 congelou.
+func TestControleDaFatia2NaoMudouOsOutros(t *testing.T) {
+	naPastaDeControles(t)
+
+	codigo, saida, erros := executa("inspect", "controles.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	conferaGolden(t, "controles.txt", saida)
+}
+
 // TestErrosDeControle cobre as recusas do schema. Cada uma existe para que um
 // erro de escrita vire mensagem apontando o campo, e não desenho errado em
 // silêncio.
@@ -134,6 +190,8 @@ func TestErrosDeControle(t *testing.T) {
 		{"campo de Controle em Retângulo", "label-em-rect.yaml", "label-em-rect.txt"},
 		{"Controle sem box", "sem-box.yaml", "sem-box.txt"},
 		{"item ativo inexistente", "ativo-alem.yaml", "ativo-alem.txt"},
+		{"lista de Controle vazia", "lista-vazia.yaml", "lista-vazia.txt"},
+		{"dois estados fora de 0 e 1", "liga-alem.yaml", "liga-alem.txt"},
 	}
 	for _, caso := range casos {
 		t.Run(caso.nome, func(t *testing.T) {
@@ -148,4 +206,70 @@ func TestErrosDeControle(t *testing.T) {
 			conferaGolden(t, caso.golden, erros)
 		})
 	}
+}
+
+// TestToggleDizOEstadoPelaPosicao é a única prova possível de que o `toggle`
+// ligado e o desligado são desenhos diferentes: o Controle é opaco no inspect,
+// então a asserção tem de ser na imagem decodificada. Ligado põe o botão à
+// direita do trilho; desligado, à esquerda. Sem cor declarada, a posição é o
+// estado.
+func TestToggleDizOEstadoPelaPosicao(t *testing.T) {
+	pasta := numaPastaTemporariaDe(t, "f6", "estados.yaml")
+
+	codigo, _, erros := executa("render", "estados.yaml", "--notes", "off")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	img := decodificaWebP(t, filepath.Join(pasta, "estados-estados.webp"))
+
+	// As duas caixas em px do Frame de 400x200: x de 40 a 160.
+	casos := []struct {
+		nome    string
+		y0, y1  int
+		direita bool
+	}{
+		{"ligado", 40, 80, true},
+		{"desligado", 120, 160, false},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nome, func(t *testing.T) {
+			esquerda := tintaNaFaixa(img, 40, 100, caso.y0, caso.y1)
+			direita := tintaNaFaixa(img, 100, 160, caso.y0, caso.y1)
+			if caso.direita && direita <= esquerda {
+				t.Errorf("tinta esquerda=%d direita=%d, queria o botão à direita", esquerda, direita)
+			}
+			if !caso.direita && esquerda <= direita {
+				t.Errorf("tinta esquerda=%d direita=%d, queria o botão à esquerda", esquerda, direita)
+			}
+		})
+	}
+}
+
+// decodificaWebP lê de volta a imagem que a CLI gravou.
+func decodificaWebP(t *testing.T, caminho string) image.Image {
+	t.Helper()
+	b, err := os.ReadFile(caminho)
+	if err != nil {
+		t.Fatalf("lendo a imagem: %v", err)
+	}
+	img, err := webp.Decode(bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("WebP inválido: %v", err)
+	}
+	return img
+}
+
+// tintaNaFaixa conta os pixels escuros num retângulo. O trilho do toggle é
+// claro e o botão é escuro, então "mais tinta" é "aqui está o botão".
+func tintaNaFaixa(img image.Image, x0, x1, y0, y1 int) int {
+	n := 0
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			r, _, _, _ := img.At(x, y).RGBA()
+			if uint8(r>>8) < 0x99 {
+				n++
+			}
+		}
+	}
+	return n
 }

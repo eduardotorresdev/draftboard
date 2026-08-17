@@ -71,9 +71,16 @@ func naPasta(t *testing.T, funcionalidade string) {
 // disco.
 func numaPastaTemporaria(t *testing.T, fixtures ...string) string {
 	t.Helper()
+	return numaPastaTemporariaDe(t, "f1", fixtures...)
+}
+
+// numaPastaTemporariaDe é numaPastaTemporaria para uma funcionalidade
+// qualquer: copia as fixtures de testdata/<funcionalidade> e vai para lá.
+func numaPastaTemporariaDe(t *testing.T, funcionalidade string, fixtures ...string) string {
+	t.Helper()
 	pasta := t.TempDir()
 	for _, nome := range fixtures {
-		origem, err := filepath.Abs(filepath.Join("testdata", "f1", nome))
+		origem, err := filepath.Abs(filepath.Join("testdata", funcionalidade, nome))
 		if err != nil {
 			t.Fatalf("caminho da fixture %s: %v", nome, err)
 		}

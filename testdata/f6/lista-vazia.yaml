@@ -1,0 +1,10 @@
+frames:
+  - name: f
+    w: 400
+    h: 200
+    layers:
+      - name: c
+        elements:
+          - control: accordion
+            box: {x: 10, y: 10, w: 80, h: 60}
+            items: 0
