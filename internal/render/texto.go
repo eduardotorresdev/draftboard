@@ -1,7 +1,6 @@
 package render
 
 import (
-	"math"
 	"strings"
 	"sync"
 
@@ -98,18 +97,20 @@ func (c *Canvas) QuebraTexto(s string, tamanho, larguraMax float64) []string {
 }
 
 // limiteDaFonte é o maior tamanho de fonte, em px de dispositivo, que se pode
-// pedir ao freetype. O truetype aloca a máscara de um glifo proporcional ao
-// quadrado do tamanho, então uma fonte sem teto custa memória sem teto: com
-// `--scale 10000`, medir "Mg" para a régua das Notas pede uma fonte de cem mil
-// px e derruba o processo por falta de memória ANTES de o teto de área chegar a
-// recusar a tela.
+// pedir ao freetype.
 //
-// O teto é a raiz de LimiteDeArea justamente para que a fonte nunca custe mais
-// que a maior tela permitida. Qualquer render que sobreviva ao teto de área
-// está ordens de grandeza abaixo daqui, então o corte só alcança escalas que já
-// seriam recusadas — o que muda é que agora elas são recusadas com código 1 e
-// mensagem, em vez de com um `out of memory`.
-var limiteDaFonte = math.Sqrt(LimiteDeArea)
+// `truetype.NewFace` não aloca a máscara de UM glifo: aloca a de 512, o tamanho
+// do cache de glifos da face. O custo é `512 * (k*S)²` bytes, com S o tamanho da
+// fonte e k a proporção entre a caixa do maior glifo e o corpo — cerca de 1,3 na
+// Go Regular. Sem teto, a régua das Notas de um `--scale 10000` pede uma fonte
+// de cem mil px e o processo morre por falta de memória ANTES de o teto de área
+// do §8 chegar a recusar a tela.
+//
+// 256 px deixa o cache em ~56 MB, a mesma ordem de grandeza da tela que o teto
+// de área já permite. Nenhum desenho legítimo chega perto: a Nota é um corpo
+// fixo pequeno, e o Rótulo de Controle acima disso exigiria um Controle de
+// centenas de px de altura em escala alta, que o teto de área já recusa.
+const limiteDaFonte = 256
 
 // face devolve a fonte no tamanho pedido, convertido para px de dispositivo.
 func (c *Canvas) face(tamanho float64) font.Face {

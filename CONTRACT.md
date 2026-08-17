@@ -335,15 +335,18 @@ Excedeu, é **erro** com código 1, nunca pânico nem swap.
 
 ### Adendo 5c (teto de tamanho da fonte)
 
-O tamanho de fonte pedido ao `freetype` satura em `√LimiteDeArea` px de
-dispositivo. A máscara de um glifo custa memória proporcional ao **quadrado** do
-tamanho, e a régua do plano de anotação (§6) mede texto na escala do desenho
-final antes de a CLI conferir o teto de área: sem saturação, `--scale 10000`
-matava o processo por falta de memória em vez de sair com código 1 e mensagem.
+O tamanho de fonte pedido ao `freetype` satura em **256 px de dispositivo**.
+`truetype.NewFace` aloca de uma vez a máscara das 512 entradas do cache de
+glifos, ao custo de `512 * (1,3 * tamanho)²` bytes — memória proporcional ao
+**quadrado** do tamanho. Sem saturação, `--scale 10000` matava o processo por
+falta de memória em vez de sair com código 1 e mensagem, porque a régua do plano
+de anotação (§6) mede texto na escala do desenho final **antes** de a CLI poder
+conferir o teto de área: o Chrome, que entra nessa conta, depende da medição.
 
-O teto é a raiz de `LimiteDeArea` para que uma fonte nunca custe mais que a maior
-tela permitida. Todo render que passa pelo teto de área está ordens de grandeza
-abaixo dele, então a saturação só alcança escalas que já seriam recusadas.
+256 px deixa o cache em ~56 MB, a mesma ordem de grandeza da tela que o teto de
+área já permite. Acima de escala ~23 as Notas passam a sair relativamente
+menores que o Frame; a medição e o desenho usam a mesma fonte saturada, então o
+layout continua coerente consigo mesmo.
 
 ## 6. `internal/notes` — plano de anotação (congelado, dono F4)
 

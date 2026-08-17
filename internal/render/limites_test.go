@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"io"
 	"math"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -699,11 +700,25 @@ func TestFonteNaoAlocaSemTeto(t *testing.T) {
 	// A régua das Notas é assim: uma tela mínima na escala do desenho final.
 	c := NewCanvas(1, 1, 0, 0, 0, 0, 1e5)
 
+	var antes, depois runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&antes)
+
 	l, a := c.MedeTexto("Mg", 11)
+
+	runtime.ReadMemStats(&depois)
+	gasto := depois.TotalAlloc - antes.TotalAlloc
+
 	if math.IsNaN(l) || math.IsInf(l, 0) || l <= 0 {
 		t.Errorf("largura medida = %v, queria um número positivo e finito", l)
 	}
 	if math.IsNaN(a) || math.IsInf(a, 0) || a <= 0 {
 		t.Errorf("altura medida = %v, queria um número positivo e finito", a)
+	}
+	// A folga é larga de propósito: o que está sob teste é a ordem de grandeza,
+	// não o número exato do freetype. Sem teto nenhum, medir aqui pede dezenas
+	// de GB e o processo morre antes de chegar a esta linha.
+	if teto := uint64(256 << 20); gasto > teto {
+		t.Errorf("medir custou %d MB, queria no máximo %d MB", gasto>>20, teto>>20)
 	}
 }

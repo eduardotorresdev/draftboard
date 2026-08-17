@@ -1,1 +1,1 @@
-erro: basico.yaml: frames[0]: a tela de saída teria 11003760000 px com --scale 100, acima do limite de 67108864 px; reduza a escala ou as dimensões do Frame
+erro: basico.yaml: frames[0]: a tela de saída teria 10624000000 px com --scale 100, acima do limite de 67108864 px; reduza a escala ou as dimensões do Frame
