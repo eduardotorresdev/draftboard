@@ -24,6 +24,8 @@ func TestConteudoTrazAsSecoesEssenciais(t *testing.T) {
 		"draftboard inspect",
 		"draftboard validate",
 		"draftboard skill",
+		"draftboard version",
+		"draftboard update",
 		"Elevação",
 		"Tom",
 		"Componente",
@@ -82,6 +84,10 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"tabela da flag --notes":              "| `--notes MODO` | `render` | `margin` | `margin` (Notas no Chrome), `float` (sobre o Frame), `off` (sem Notas) |",
 		"tabela da flag --layers":             "| `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |",
 		"tabela da flag --install":            "| `--install [DIR]` | `skill` | `~/.claude/skills` | grava a skill em `<DIR>/draftboard/SKILL.md` |",
+		"tabela da flag --sync":               "| `--sync [DIR]` | `skill` | `~/.claude/skills` | regrava a skill só se o conteúdo mudou, perguntando antes |",
+		"tabela da flag --check":              "| `--check` | `update` | desligado | só reporta se há versão nova; não escreve nada |",
+		"tabela da flag --yes":                "| `--yes` | `skill`, `update` | desligado | responde `s` a qualquer pergunta |",
+		"tabela da flag --no":                 "| `--no` | `skill`, `update` | desligado | responde `n` a qualquer pergunta |",
 		"nome de saída sem --layers":          "| sem `--layers` | `<doc>-<frame>.webp` |",
 		"nome de saída com --layers":          "| com `--layers` | `<doc>-<frame>-<nn>-<camada>.webp`, `nn` de dois dígitos a partir de `01` |",
 		"fórmula do Círculo no Frame":         "Círculo:  L = A = d/100*FL      (largura nos dois eixos — nunca vira elipse)",
@@ -407,4 +413,57 @@ func primeiraLinha(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// TestEstaSincronizadaReconheceInstalacaoIgual cobre o caso em que `skill
+// --sync` não tem nada a fazer, que é o caminho normal de um update.
+func TestEstaSincronizadaReconheceInstalacaoIgual(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := skill.Instala(dir); err != nil {
+		t.Fatalf("Instala devolveu erro: %v", err)
+	}
+	igual, caminho, err := skill.EstaSincronizada(dir)
+	if err != nil {
+		t.Fatalf("EstaSincronizada devolveu erro: %v", err)
+	}
+	if !igual {
+		t.Errorf("skill recém-instalada foi reportada como dessincronizada")
+	}
+	if esperado := filepath.Join(dir, "draftboard", "SKILL.md"); caminho != esperado {
+		t.Errorf("caminho = %q, esperado %q", caminho, esperado)
+	}
+}
+
+func TestEstaSincronizadaReconheceInstalacaoDiferente(t *testing.T) {
+	dir := t.TempDir()
+	caminho, err := skill.Instala(dir)
+	if err != nil {
+		t.Fatalf("Instala devolveu erro: %v", err)
+	}
+	if err := os.WriteFile(caminho, []byte("skill de outra versão\n"), 0o644); err != nil {
+		t.Fatalf("não foi possível alterar a skill instalada: %v", err)
+	}
+	igual, _, err := skill.EstaSincronizada(dir)
+	if err != nil {
+		t.Fatalf("EstaSincronizada devolveu erro: %v", err)
+	}
+	if igual {
+		t.Errorf("skill alterada foi reportada como sincronizada")
+	}
+}
+
+// TestEstaSincronizadaTrataDestinoAusenteComoDessincronizado: instalar é o que
+// resolve tanto o arquivo diferente quanto o arquivo ausente, então ausência
+// não é erro.
+func TestEstaSincronizadaTrataDestinoAusenteComoDessincronizado(t *testing.T) {
+	igual, caminho, err := skill.EstaSincronizada(t.TempDir())
+	if err != nil {
+		t.Fatalf("EstaSincronizada devolveu erro: %v", err)
+	}
+	if igual {
+		t.Errorf("destino ausente foi reportado como sincronizado")
+	}
+	if caminho == "" {
+		t.Errorf("EstaSincronizada não devolveu o caminho conferido")
+	}
 }

@@ -122,3 +122,31 @@ func diretorioPadrao() (string, error) {
 	}
 	return filepath.Join(casa, ".claude", "skills"), nil
 }
+
+// EstaSincronizada compara a skill embutida com a instalada em
+// <dir>/draftboard/SKILL.md e devolve o caminho conferido. Quando dir é vazio,
+// o destino padrão é o mesmo de Instala. Destino ausente conta como
+// dessincronizado, não como erro: instalar é justamente o que resolve os dois
+// casos.
+//
+// A comparação é byte a byte. Quem chama é o verbo `skill --sync`, e ele roda
+// no binário NOVO depois de uma troca: só o binário novo carrega a skill nova
+// embutida, então só ele pode responder esta pergunta.
+func EstaSincronizada(dir string) (igual bool, caminho string, err error) {
+	if dir == "" {
+		padrao, err := diretorioPadrao()
+		if err != nil {
+			return false, "", err
+		}
+		dir = padrao
+	}
+	caminho = filepath.Join(dir, nomeDoDiretorio, nomeDoArquivo)
+	instalada, err := os.ReadFile(caminho)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, caminho, nil
+		}
+		return false, caminho, fmt.Errorf("ler %s: %w", caminho, err)
+	}
+	return string(instalada) == conteudo, caminho, nil
+}

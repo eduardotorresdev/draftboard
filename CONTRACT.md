@@ -8,7 +8,10 @@ Vocabulário obrigatório: o de `CONTEXT.md`, em código, mensagens de erro e sk
 `module github.com/eduardotorresdev/draftboard`, Go 1.26, **sem cgo**.
 
 `go.mod` e `go.sum` **já estão prontos e são congelados**. Não rode `go mod tidy`,
-não adicione dependência. Deps disponíveis: `gopkg.in/yaml.v3`, `github.com/fogleman/gg`,
+não adicione dependência. Isso vale inclusive para F7: `internal/update` usa só
+`net/http`, `encoding/json`, `archive/tar`, `compress/gzip`, `crypto/sha256`, `os`,
+`os/exec`, `runtime`, `strconv` e `strings` — sem semver de terceiros, sem isatty,
+sem biblioteca de self-update. Deps disponíveis: `gopkg.in/yaml.v3`, `github.com/fogleman/gg`,
 `github.com/HugoSmits86/nativewebp`, `golang.org/x/image v0.24.0` (inclui
 `font/gofont/goregular`) e `github.com/golang/freetype` (carregador de fonte).
 
@@ -21,8 +24,9 @@ Dono de cada diretório (ninguém escreve fora do seu):
 | `internal/schema/`, `internal/resolve/`, `internal/inspect/` | F1, depois F2 |
 | `internal/render/` | F3 |
 | `internal/notes/` | F4 |
-| `internal/skill/`, `SKILL.md` | F5 |
-| `main.go` | F1 (dispatch + `render`/`inspect`/`validate`); F5 acrescenta só o caso `skill` |
+| `internal/skill/`, `SKILL.md` | F5; **F7 acrescenta apenas `EstaSincronizada`** |
+| `internal/update/`, `.github/workflows/` | F7 |
+| `main.go` | F1 (dispatch + `render`/`inspect`/`validate`); F5 acrescenta só o caso `skill`; F7 acrescenta os casos `version` e `update` e o parâmetro `stdin` de `run` |
 | `testdata/` | subdiretório por funcionalidade: `testdata/f1/`, `testdata/f2/`, ... |
 
 ## 1. `internal/scene` — o contrato central
@@ -351,6 +355,40 @@ draftboard skill    [--install [DIR]]
   por slug: minúsculas, cada sequência de caracteres fora de `[a-z0-9]` vira um `-` único,
   `-` das pontas removidos.
 
+### 7b. Verbos `version` e `update` (adendo, congelado, dono F7)
+
+```
+draftboard skill    [--install [DIR]] [--sync [DIR]] [--yes] [--no]
+draftboard version
+draftboard update   [--check] [--yes] [--no]
+```
+
+- `run` passa a receber `stdin`: `run(args []string, stdin io.Reader, stdout, stderr io.Writer) int`.
+  Um verbo só o consome — `skill --sync`, que pergunta antes de regravar.
+- `version` imprime três linhas no stdout: `draftboard <versao>`, `commit: <sha>`,
+  `data: <RFC 3339>`. Sem os `-ldflags -X` do release, valem `dev`, `desconhecido` e
+  `desconhecida` — é o estado de quem instalou por `go install`.
+- `update` imprime no stdout **apenas o que foi escrito**: o caminho do binário
+  substituído e, se a skill foi regravada, o caminho dela. Status, avisos e a pergunta
+  vão para stderr.
+- `update --check` **não escreve nada** e imprime exatamente uma linha de status:
+  `atualização disponível: <nova> (atual: <atual>)` ou `já na versão mais recente: <v>`.
+- **Códigos de saída seguem 0/1 do §7**: `--check` sai 0 sempre que a CONSULTA
+  funcionou, e 1 só quando ela falhou. Não existe código 2 para "há versão nova".
+- Versão atual não reconhecível (`dev`) conta como **desatualizada**: o `update`
+  segue, depois de um aviso. A garantia contra binário adulterado é a soma SHA-256,
+  não a comparação de Versão.
+- `skill --sync` regrava a skill **só quando o conteúdo mudou**, e pergunta antes.
+  Já sincronizada não imprime nada. **Entrada que não é um terminal nunca grava**:
+  avisa no stderr e sai 0. `--yes`/`--no` respondem por quem não tem terminal.
+- `--install` e `--sync` juntos são erro de uso.
+- Erros de `version`, `update` e `skill` usam a forma `erro: <mensagem>` **sem** o
+  prefixo `<arquivo>: <local>:` do §7 — não há Documento envolvido. Avisos seguem
+  `aviso: <mensagem>`.
+- Seam de teste: `DRAFTBOARD_LANCAMENTOS_URL`, quando não vazia, substitui a URL base
+  da consulta. Não é documentada na skill, e **nenhum token de autenticação é anexado
+  quando a URL base não é a padrão**.
+
 ## 8. Erros × avisos (congelado)
 
 **Erro** (código 1): chave desconhecida (com sugestão), tipo inválido, mais de uma chave
@@ -405,3 +443,49 @@ a Elevação é computada — só o resultado observável.
 
 Portão obrigatório antes de entregar: `gofmt -l .` (vazio), `go build ./...`,
 `go vet ./...`, `go test ./...`.
+
+### 9b. Testes do `update` (adendo, dono F7)
+
+O seam primário do `update` é `internal/update` com `httptest.Server`, e não a CLI: a
+CLI só alcança um servidor de teste pelo `DRAFTBOARD_LANCAMENTOS_URL` do adendo 7b.
+Fixtures de Lançamento em `testdata/f7/`, com `%BASE%` no lugar do endereço do
+servidor. O tarball e o `checksums.txt` são montados em tempo de teste — soma golden
+estática quebraria a cada mudança de payload.
+
+**Nenhum teste chama `update.Executavel()`, e `Opcoes.Destino` sempre aponta para
+dentro de um `t.TempDir()`.** Um teste que deixe o Destino no padrão substituiria o
+próprio binário de teste em execução.
+
+Toda falha de `Aplica` é afirmada em dobro: os bytes originais do destino sobrevivem
+**e** o diretório continua com exatamente uma entrada — a primeira metade prova que
+nada foi trocado, a segunda que nenhum temporário ficou para trás.
+
+## 10. Distribuição (adendo, congelado, dono F7)
+
+O `update` depende de um contrato de nomes com o workflow de release. Mudar qualquer
+linha desta tabela quebra o updater das versões já instaladas.
+
+| Item | Valor |
+| --- | --- |
+| Ativo | `draftboard_<tag>_<goos>_<goarch>.tar.gz` — a tag entra **verbatim**, com o `v` |
+| Conteúdo do Ativo | **exatamente uma** entrada regular, na raiz, chamada `draftboard` |
+| Somas | `checksums.txt`, formato `sha256sum`: 64 hex, dois espaços, nome-base do Ativo |
+| Consulta | `GET <base>/releases/latest` |
+| Plataformas | darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 |
+
+- **O cliente não embute a lista de plataformas**: ele calcula o nome esperado a partir
+  de `runtime.GOOS`/`GOARCH` e o procura entre os Ativos publicados. Ativo ausente é o
+  erro. Publicar uma plataforma nova não exige tocar no cliente.
+- `/releases/latest` exclui draft e prerelease. O workflow publica com `--prerelease`
+  toda tag que contenha `-`, então uma `v1.0.0-rc.1` é baixável por URL mas **nunca é
+  oferecida** pelo `update`.
+- Um nome que aparece zero ou duas-ou-mais vezes no `checksums.txt` é Lançamento
+  quebrado: as duas situações são erro, nunca sorteio.
+- A troca do binário é sempre `os.Rename` sobre o **arquivo real** (`os.Executable` +
+  `EvalSymlinks`), com o temporário criado no diretório do destino — nunca em
+  `os.TempDir()`, que costuma estar em outro device e não tem move atômico na
+  biblioteca padrão. **Nada é renomeado antes de a soma conferir.**
+- Limite conhecido, registrado de propósito: SHA-256 sobre HTTPS protege contra
+  corrupção e truncamento, **não** contra Lançamento comprometido. Assinatura de
+  verdade exigiria dependência nova (minisign, cosign) ou shell-out, e as duas coisas
+  são proibidas pelo §0.

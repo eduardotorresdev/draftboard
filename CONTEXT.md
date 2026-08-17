@@ -97,3 +97,19 @@ Texto desenhado dentro de um Controle. Distingue-se da Nota por estar no plano
 do desenho: participa da Elevação e aparece no export por Camada. Não é
 Superfície — nada se apoia sobre ele.
 _Avoid_: label, caption, legenda, texto
+
+### Distribuição
+
+**Versão**:
+Identificação do binário instalado, no formato de uma tag `vX.Y.Z`. Binário
+construído sem essa informação se identifica como `dev`.
+_Avoid_: release local, build, número
+
+**Lançamento**:
+Conjunto publicado no GitHub sob uma tag: os Ativos de cada plataforma mais o
+arquivo de somas.
+_Avoid_: release, publicação, tag
+
+**Ativo**:
+Arquivo de um Lançamento — o `.tar.gz` de uma plataforma, ou o arquivo de somas.
+_Avoid_: asset, artefato, pacote, tarball

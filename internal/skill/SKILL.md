@@ -201,7 +201,9 @@ Consequência prática: para dar contraste a um Elemento, **aninhe-o** dentro de
 draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
 draftboard inspect  <arquivo.yaml>
 draftboard validate <arquivo.yaml>
-draftboard skill    [--install [DIR]]
+draftboard skill    [--install [DIR]] [--sync [DIR]] [--yes] [--no]
+draftboard version
+draftboard update   [--check] [--yes] [--no]
 ```
 
 | Flag | Verbo | Padrão | Efeito |
@@ -211,11 +213,19 @@ draftboard skill    [--install [DIR]]
 | `--notes MODO` | `render` | `margin` | `margin` (Notas no Chrome), `float` (sobre o Frame), `off` (sem Notas) |
 | `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |
 | `--install [DIR]` | `skill` | `~/.claude/skills` | grava a skill em `<DIR>/draftboard/SKILL.md` |
+| `--sync [DIR]` | `skill` | `~/.claude/skills` | regrava a skill só se o conteúdo mudou, perguntando antes |
+| `--check` | `update` | desligado | só reporta se há versão nova; não escreve nada |
+| `--yes` | `skill`, `update` | desligado | responde `s` a qualquer pergunta |
+| `--no` | `skill`, `update` | desligado | responde `n` a qualquer pergunta |
 
 - `render` imprime no stdout **apenas os caminhos escritos**, um por linha, na ordem de geração.
 - `inspect` imprime a árvore no stdout e **não escreve nada em disco**.
 - `validate` não imprime nada no stdout quando passa.
 - `skill` sem `--install` imprime a skill no stdout.
+- `version` imprime versão, commit e data do build no stdout.
+- `update` troca o binário pelo do último lançamento e imprime no stdout o caminho substituído.
+- `update --check` só reporta se há versão nova e **não escreve nada**.
+- `skill --sync` regrava a skill só quando ela mudou, e não grava nada quando a entrada não é um terminal.
 - Avisos vão para stderr com prefixo `aviso: `; erros vão para stderr com prefixo `erro: `.
 - Sucesso sai com código `0`; erro sai com `1`.
 

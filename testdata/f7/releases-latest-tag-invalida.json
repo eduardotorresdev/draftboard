@@ -1,0 +1,15 @@
+{
+  "tag_name": "latest",
+  "assets": [
+    {
+      "name": "draftboard_latest_linux_amd64.tar.gz",
+      "browser_download_url": "%BASE%/download/draftboard_latest_linux_amd64.tar.gz",
+      "size": 5088311
+    },
+    {
+      "name": "checksums.txt",
+      "browser_download_url": "%BASE%/download/checksums.txt",
+      "size": 96
+    }
+  ]
+}

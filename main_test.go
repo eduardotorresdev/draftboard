@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/eduardotorresdev/draftboard/internal/notes"
 	"github.com/eduardotorresdev/draftboard/internal/render"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
+	"github.com/eduardotorresdev/draftboard/internal/skill"
 )
 
 // atualiza regrava os golden files a partir da saída observada.
@@ -33,8 +36,16 @@ func TestMain(m *testing.M) {
 // saída, o stdout e o stderr. É o seam primário dos testes: nenhum deles
 // conhece a estrutura interna da resolução nem como a Elevação é computada.
 func executa(args ...string) (codigo int, stdout, stderr string) {
+	return executaComEntrada("", args...)
+}
+
+// executaComEntrada é executa com uma entrada padrão, para os verbos que
+// perguntam algo. A entrada é um strings.Reader, que não é dispositivo de
+// caractere: os testes nunca são vistos como terminal, o que é exatamente o
+// comportamento que eles precisam afirmar.
+func executaComEntrada(entrada string, args ...string) (codigo int, stdout, stderr string) {
 	var saida, erros bytes.Buffer
-	codigo = run(args, &saida, &erros)
+	codigo = run(args, strings.NewReader(entrada), &saida, &erros)
 	return codigo, saida.String(), erros.String()
 }
 
@@ -423,5 +434,205 @@ func TestVerboDesconhecidoFalha(t *testing.T) {
 	}
 	if stderr == "" {
 		t.Error("stderr vazio: o verbo desconhecido não foi reportado")
+	}
+}
+
+// servidorDeLancamentos sobe um servidor local que imita a API do GitHub e
+// aponta a CLI para ele pelo seam documentado no CONTRATO.
+func servidorDeLancamentos(t *testing.T) {
+	t.Helper()
+	bruto, err := os.ReadFile(filepath.Join("testdata", "f7", "releases-latest.json"))
+	if err != nil {
+		t.Fatalf("não foi possível ler a fixture: %v", err)
+	}
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(strings.ReplaceAll(string(bruto), "%BASE%", srv.URL)))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("DRAFTBOARD_LANCAMENTOS_URL", srv.URL)
+}
+
+func TestVersionImprimeVersaoCommitEData(t *testing.T) {
+	codigo, stdout, stderr := executa("version")
+	if codigo != 0 {
+		t.Fatalf("código = %d, stderr = %q", codigo, stderr)
+	}
+	if stderr != "" {
+		t.Errorf("version escreveu no stderr: %q", stderr)
+	}
+	linhas := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
+	if len(linhas) != 3 {
+		t.Fatalf("version escreveu %d linhas, esperado 3:\n%s", len(linhas), stdout)
+	}
+	// Sem os -X do release, o binário se identifica como "dev". É esse o
+	// estado de quem instalou por `go install`.
+	if linhas[0] != "draftboard dev" {
+		t.Errorf("primeira linha = %q, esperado \"draftboard dev\"", linhas[0])
+	}
+}
+
+// TestUpdateCheckReportaVersaoDisponivel também fixa que a comparação
+// impossível ("dev" contra uma tag) vira aviso, e não erro.
+func TestUpdateCheckReportaVersaoDisponivel(t *testing.T) {
+	servidorDeLancamentos(t)
+	codigo, stdout, stderr := executa("update", "--check")
+	if codigo != 0 {
+		t.Fatalf("código = %d, stderr = %q", codigo, stderr)
+	}
+	if !strings.Contains(stdout, "atualização disponível: v1.4.0") {
+		t.Errorf("stdout = %q, esperado a linha de atualização disponível", stdout)
+	}
+	if !strings.HasPrefix(stderr, "aviso: ") {
+		t.Errorf("stderr = %q, esperado o aviso da versão \"dev\"", stderr)
+	}
+}
+
+// TestUpdateCheckNaoEscreveEmDisco é o que faz `--check` ser seguro de rodar em
+// qualquer lugar, inclusive num diretório de trabalho de alguém.
+func TestUpdateCheckNaoEscreveEmDisco(t *testing.T) {
+	servidorDeLancamentos(t)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if codigo, _, stderr := executa("update", "--check"); codigo != 0 {
+		t.Fatalf("código = %d, stderr = %q", codigo, stderr)
+	}
+	entradas, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("não foi possível listar %s: %v", dir, err)
+	}
+	if len(entradas) != 0 {
+		t.Errorf("update --check deixou %d entrada(s) em disco", len(entradas))
+	}
+}
+
+func TestUpdateRejeitaOpcaoInvalida(t *testing.T) {
+	codigo, stdout, stderr := executa("update", "--forca")
+	if codigo != 1 {
+		t.Errorf("código = %d, esperado 1", codigo)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, esperado vazio", stdout)
+	}
+	if !strings.HasPrefix(stderr, "erro: ") {
+		t.Errorf("stderr = %q, esperado começar com \"erro: \"", stderr)
+	}
+}
+
+func TestUpdateRejeitaYesComNo(t *testing.T) {
+	if codigo, _, _ := executa("update", "--yes", "--no"); codigo != 1 {
+		t.Errorf("código = %d, esperado 1", codigo)
+	}
+}
+
+func TestSkillRejeitaInstallComSync(t *testing.T) {
+	if codigo, _, _ := executa("skill", "--install", "--sync"); codigo != 1 {
+		t.Errorf("código = %d, esperado 1", codigo)
+	}
+}
+
+// TestSkillSyncNaoImprimeNadaQuandoJaSincronizada é o caminho normal de um
+// update: a skill não mudou, então o verbo é silencioso e um update de rotina
+// cabe em duas linhas.
+func TestSkillSyncNaoImprimeNadaQuandoJaSincronizada(t *testing.T) {
+	casa := t.TempDir()
+	t.Setenv("HOME", casa)
+	if codigo, _, stderr := executa("skill", "--install"); codigo != 0 {
+		t.Fatalf("instalação falhou: código = %d, stderr = %q", codigo, stderr)
+	}
+	codigo, stdout, stderr := executa("skill", "--sync")
+	if codigo != 0 {
+		t.Fatalf("código = %d, stderr = %q", codigo, stderr)
+	}
+	if stdout != "" || stderr != "" {
+		t.Errorf("--sync falou com a skill já sincronizada: stdout = %q, stderr = %q", stdout, stderr)
+	}
+}
+
+// TestSkillSyncNaoGravaQuandoAEntradaNaoEUmTerminal: gravar em ~/.claude numa
+// invocação canalizada violaria o padrão de só reportar; errar quebraria o
+// caminho dirigido por agente. Então o verbo avisa e sai 0.
+func TestSkillSyncNaoGravaQuandoAEntradaNaoEUmTerminal(t *testing.T) {
+	casa := t.TempDir()
+	t.Setenv("HOME", casa)
+	codigo, stdout, stderr := executaComEntrada("s\n", "skill", "--sync")
+	if codigo != 0 {
+		t.Fatalf("código = %d, stderr = %q", codigo, stderr)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, esperado vazio: nada foi gravado", stdout)
+	}
+	if !strings.HasPrefix(stderr, "aviso: ") {
+		t.Errorf("stderr = %q, esperado o aviso de entrada não interativa", stderr)
+	}
+	if _, err := os.Stat(filepath.Join(casa, ".claude", "skills", "draftboard", "SKILL.md")); !os.IsNotExist(err) {
+		t.Errorf("a skill foi gravada sem confirmação: %v", err)
+	}
+}
+
+func TestSkillSyncGravaComYes(t *testing.T) {
+	casa := t.TempDir()
+	t.Setenv("HOME", casa)
+	codigo, stdout, stderr := executa("skill", "--sync", "--yes")
+	if codigo != 0 {
+		t.Fatalf("código = %d, stderr = %q", codigo, stderr)
+	}
+	esperado := filepath.Join(casa, ".claude", "skills", "draftboard", "SKILL.md")
+	if strings.TrimSpace(stdout) != esperado {
+		t.Errorf("stdout = %q, esperado o caminho gravado %q", stdout, esperado)
+	}
+	if _, err := os.Stat(esperado); err != nil {
+		t.Errorf("a skill não foi gravada: %v", err)
+	}
+}
+
+func TestSkillSyncNaoGravaComNo(t *testing.T) {
+	casa := t.TempDir()
+	t.Setenv("HOME", casa)
+	codigo, stdout, _ := executa("skill", "--sync", "--no")
+	if codigo != 0 {
+		t.Fatalf("código = %d", codigo)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, esperado vazio", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(casa, ".claude", "skills", "draftboard", "SKILL.md")); !os.IsNotExist(err) {
+		t.Errorf("--no gravou a skill: %v", err)
+	}
+}
+
+// TestConfirmaSoAceitaSim cobre a leitura da resposta, que a suíte não alcança
+// pela CLI: em teste a entrada nunca é um terminal, e sem terminal o verbo não
+// pergunta. O padrão é sempre o que NÃO escreve em disco.
+func TestConfirmaSoAceitaSim(t *testing.T) {
+	sim := []string{"s\n", "sim\n", "y\n", "yes\n", "S\n", "  Sim  \n", "SIM"}
+	for _, e := range sim {
+		if !confirma(strings.NewReader(e)) {
+			t.Errorf("confirma(%q) = false, esperado true", e)
+		}
+	}
+	nao := []string{"", "\n", "n\n", "nao\n", "no\n", "talvez\n", "sim mais tarde\n"}
+	for _, e := range nao {
+		if confirma(strings.NewReader(e)) {
+			t.Errorf("confirma(%q) = true, esperado false", e)
+		}
+	}
+}
+
+// TestUsoDaCLIBateComASkill fecha a duplicação mais provável de dessincronizar:
+// o bloco de uso de imprimeUso e o bloco de CLI da skill são duas cópias à mão
+// das mesmas linhas, e nada mais confere que elas concordam.
+func TestUsoDaCLIBateComASkill(t *testing.T) {
+	var uso bytes.Buffer
+	imprimeUso(&uso)
+	conteudo := skill.Conteudo()
+	for _, linha := range strings.Split(uso.String(), "\n") {
+		linha = strings.TrimSpace(linha)
+		if linha == "" || linha == "uso:" {
+			continue
+		}
+		if !strings.Contains(conteudo, linha) {
+			t.Errorf("a skill não traz a linha de uso:\n%s", linha)
+		}
 	}
 }

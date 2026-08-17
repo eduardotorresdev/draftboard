@@ -1,0 +1,15 @@
+{
+  "tag_name": "v1.4.0",
+  "assets": [
+    {
+      "name": "draftboard_v1.4.0_darwin_arm64.tar.gz",
+      "browser_download_url": "%BASE%/download/draftboard_v1.4.0_darwin_arm64.tar.gz",
+      "size": 4959330
+    },
+    {
+      "name": "checksums.txt",
+      "browser_download_url": "%BASE%/download/checksums.txt",
+      "size": 96
+    }
+  ]
+}

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/eduardotorresdev/draftboard/internal/resolve"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 	"github.com/eduardotorresdev/draftboard/internal/skill"
+	"github.com/eduardotorresdev/draftboard/internal/update"
 )
 
 // comandoRender resolve o Documento e escreve uma imagem por Frame, ou uma por
@@ -150,38 +153,194 @@ func comandoValidate(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// comandoSkill imprime a skill embutida, ou a instala e imprime o caminho
+// comandoSkill imprime a skill embutida, ou a grava e imprime o caminho
 // escrito.
-func comandoSkill(args []string, stdout, stderr io.Writer) int {
-	instalar := false
-	destino := ""
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		nome, valor, temValor := strings.Cut(a, "=")
-		switch nome {
-		case "--install", "-install":
-			instalar = true
-			switch {
-			case temValor:
-				destino = valor
-			case i+1 < len(args) && !ehOpcao(args[i+1]):
-				i++
-				destino = args[i]
-			}
-		default:
-			return usoInvalido(stderr, fmt.Errorf("argumento inesperado %q", a))
-		}
+//
+// Sem opção, imprime no stdout. Com `--install`, grava sempre. Com `--sync`,
+// grava só quando a skill embutida difere da instalada, e pergunta antes — é o
+// verbo que `update` chama no binário novo depois de trocar o binário, porque
+// só o binário novo carrega a skill nova.
+func comandoSkill(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	o, err := interpretaSkill(args)
+	if err != nil {
+		return usoInvalido(stderr, err)
 	}
-	if !instalar {
+	switch {
+	case o.sincronizar:
+		return sincronizaSkill(o, stdin, stdout, stderr)
+	case o.instalar:
+		caminho, err := skill.Instala(o.destino)
+		if err != nil {
+			return imprimeErro(stderr, err)
+		}
+		fmt.Fprintln(stdout, caminho)
+		return 0
+	default:
 		if err := skill.Imprime(stdout); err != nil {
 			return imprimeErro(stderr, err)
 		}
 		return 0
 	}
-	caminho, err := skill.Instala(destino)
+}
+
+// sincronizaSkill regrava a skill instalada só quando ela difere da embutida.
+//
+// Já sincronizada não imprime nada e sai 0, para que um `update` de rotina
+// caiba em duas linhas. Quando a entrada não é um terminal, não pergunta e não
+// grava: escrever em ~/.claude numa invocação canalizada violaria o padrão de
+// só reportar, e errar quebraria o caminho dirigido por agente, que é o
+// consumidor primário desta CLI.
+func sincronizaSkill(o opcoesSkill, stdin io.Reader, stdout, stderr io.Writer) int {
+	igual, caminho, err := skill.EstaSincronizada(o.destino)
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	if igual {
+		return 0
+	}
+	switch o.resposta {
+	case sempreNao:
+		return 0
+	case sempreSim:
+	default:
+		if !ehTerminal(stdin) {
+			imprimeAviso(stderr, fmt.Sprintf(
+				"a skill embutida mudou; rode %q para atualizar (a entrada não é um terminal, nada foi gravado)",
+				"draftboard skill --install"))
+			return 0
+		}
+		fmt.Fprintln(stderr, "a skill embutida mudou nesta versão.")
+		fmt.Fprintf(stderr, "reinstalar em %s? [s/N] ", caminho)
+		if !confirma(stdin) {
+			return 0
+		}
+	}
+	escrito, err := skill.Instala(o.destino)
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	fmt.Fprintln(stdout, escrito)
+	return 0
+}
+
+// comandoVersion imprime a Versão, o commit e a data do build no stdout.
+func comandoVersion(stdout, stderr io.Writer) int {
+	if err := update.ImprimeVersao(stdout); err != nil {
+		return imprimeErro(stderr, err)
+	}
+	return 0
+}
+
+// comandoUpdate troca o binário em execução pelo do último Lançamento.
+//
+// O stdout carrega só o que foi escrito — o caminho do binário substituído, e
+// depois o da skill, se ela foi regravada —, do mesmo jeito que `render`
+// imprime só os caminhos das imagens. Status, avisos e a pergunta vão para
+// stderr.
+//
+// `--check` sai 0 sempre que a CONSULTA funcionou: a resposta é a linha única
+// de stdout, que é o que um script grepa. Um código 2 para "há versão nova"
+// quebraria o contrato de 0/1 do §7 do CONTRATO.
+func comandoUpdate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	o, err := interpretaUpdate(args)
+	if err != nil {
+		return usoInvalido(stderr, err)
+	}
+	opcoes := update.Opcoes{}
+	// Seam de teste: aponta a consulta para um servidor local. Documentado no
+	// CONTRATO, deliberadamente fora da skill.
+	if u := os.Getenv("DRAFTBOARD_LANCAMENTOS_URL"); u != "" {
+		opcoes.BaseURL = u
+	}
+	atual := update.Atual()
+
+	lancamento, maisNova, err := update.Verifica(opcoes)
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	ordem, comparavel := update.Compara(atual.Versao, lancamento.Versao)
+	switch {
+	case !comparavel:
+		imprimeAviso(stderr, fmt.Sprintf(
+			"versão atual %q (binário construído sem informação de versão); não é possível comparar com %s",
+			atual.Versao, lancamento.Versao))
+	case ordem > 0:
+		imprimeAviso(stderr, fmt.Sprintf(
+			"a versão atual %s é mais nova que o último lançamento %s",
+			atual.Versao, lancamento.Versao))
+	}
+	if !maisNova {
+		fmt.Fprintf(stdout, "já na versão mais recente: %s\n", atual.Versao)
+		return 0
+	}
+	if o.conferir {
+		fmt.Fprintf(stdout, "atualização disponível: %s (atual: %s)\n", lancamento.Versao, atual.Versao)
+		return 0
+	}
+
+	caminho, err := update.Aplica(opcoes, lancamento, stderr)
 	if err != nil {
 		return imprimeErro(stderr, err)
 	}
 	fmt.Fprintln(stdout, caminho)
+	sincronizaComOBinarioNovo(caminho, o.resposta, stdin, stdout, stderr)
 	return 0
+}
+
+// sincronizaComOBinarioNovo pede ao binário RECÉM-INSTALADO que confira a
+// skill.
+//
+// A delegação não é rodeio: a skill é embutida com go:embed, então o processo
+// em execução — o binário antigo — não tem como saber qual é a skill da versão
+// nova. Quem compara tem de ser o binário novo. O terminal é repassado inteiro
+// para que a pergunta seja feita no tty do usuário.
+//
+// Falha do filho não derruba o update: o usuário pediu troca de binário e
+// teve. O aviso diz como completar o resto à mão.
+func sincronizaComOBinarioNovo(binario string, r resposta, stdin io.Reader, stdout, stderr io.Writer) {
+	args := []string{"skill", "--sync"}
+	switch r {
+	case sempreSim:
+		args = append(args, "--yes")
+	case sempreNao:
+		args = append(args, "--no")
+	}
+	cmd := exec.Command(binario, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, stderr
+	if err := cmd.Run(); err != nil {
+		imprimeAviso(stderr, fmt.Sprintf(
+			"binário atualizado, mas a sincronização da skill falhou; rode %q",
+			"draftboard skill --sync"))
+	}
+}
+
+// ehTerminal reporta se r é um dispositivo de caractere — o mais perto de uma
+// detecção de terminal que a biblioteca padrão permite, já que não há isatty na
+// stdlib e dependência nova é proibida.
+//
+// Pipe e arquivo comum não são dispositivo de caractere, então o resultado é o
+// certo nos testes e nos scripts. /dev/null é falso positivo conhecido e
+// inofensivo: ler dele dá EOF na hora, o que confirma() lê como "não".
+func ehTerminal(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+// confirma lê uma linha e reporta se ela é um sim. Linha vazia, EOF e qualquer
+// outra resposta são "não" — o padrão é sempre o que não escreve em disco.
+func confirma(stdin io.Reader) bool {
+	linha, err := bufio.NewReader(stdin).ReadString('\n')
+	if err != nil && linha == "" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(linha)) {
+	case "s", "sim", "y", "yes":
+		return true
+	default:
+		return false
+	}
 }

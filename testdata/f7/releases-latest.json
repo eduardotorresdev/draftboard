@@ -1,0 +1,30 @@
+{
+  "tag_name": "v1.4.0",
+  "assets": [
+    {
+      "name": "draftboard_v1.4.0_darwin_arm64.tar.gz",
+      "browser_download_url": "%BASE%/download/draftboard_v1.4.0_darwin_arm64.tar.gz",
+      "size": 4959330
+    },
+    {
+      "name": "draftboard_v1.4.0_darwin_amd64.tar.gz",
+      "browser_download_url": "%BASE%/download/draftboard_v1.4.0_darwin_amd64.tar.gz",
+      "size": 5102044
+    },
+    {
+      "name": "draftboard_v1.4.0_linux_amd64.tar.gz",
+      "browser_download_url": "%BASE%/download/draftboard_v1.4.0_linux_amd64.tar.gz",
+      "size": 5088311
+    },
+    {
+      "name": "draftboard_v1.4.0_linux_arm64.tar.gz",
+      "browser_download_url": "%BASE%/download/draftboard_v1.4.0_linux_arm64.tar.gz",
+      "size": 4930127
+    },
+    {
+      "name": "checksums.txt",
+      "browser_download_url": "%BASE%/download/checksums.txt",
+      "size": 396
+    }
+  ]
+}

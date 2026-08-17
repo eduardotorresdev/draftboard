@@ -1,0 +1,72 @@
+# Publica os binários de um Lançamento quando uma tag `v*` é empurrada.
+#
+# Job único, sem matrix, de propósito: o build é Go puro com CGO_ENABLED=0, então
+# um runner cross-compila os quatro alvos e produz UM checksums.txt num lugar só.
+# Uma matrix exigiria um job de agregação e upload/download de artifact apenas
+# para concatenar quatro somas.
+#
+# O nome do Ativo e o formato do checksums.txt são contrato com o verbo
+# `draftboard update` — veja o adendo 10 do CONTRACT.md antes de mexer neles.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  publica:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # O portão do §9 do CONTRATO roda aqui dentro: tag quebrada não publica.
+      - name: portão
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l .)"
+          go build ./...
+          go vet ./...
+          go test ./...
+
+      - name: constrói e empacota
+        run: |
+          set -euo pipefail
+          DATA=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          COMMIT=$(git rev-parse --short HEAD)
+          P=github.com/eduardotorresdev/draftboard/internal/update
+          LDFLAGS="-s -w -X $P.versao=$TAG -X $P.commit=$COMMIT -X $P.data=$DATA"
+          mkdir -p dist
+          # O runner é Linux com GNU tar, mas quem empacotar isto num Mac
+          # ganharia um membro AppleDouble "._draftboard" escondido no tar, e o
+          # updater — que exige exatamente um membro — recusaria o ativo.
+          export COPYFILE_DISABLE=1
+          for alvo in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
+            export GOOS=${alvo%/*} GOARCH=${alvo#*/} CGO_ENABLED=0
+            go build -trimpath -ldflags "$LDFLAGS" -o dist/draftboard .
+            # -C dist ... draftboard deixa o tar com um único membro chamado
+            # "draftboard" na raiz, sem prefixo ./ — é o que o updater exige.
+            # As flags de ordenação e metadados tornam o tarball reprodutível.
+            tar --sort=name --mtime="$DATA" --owner=0 --group=0 --numeric-owner \
+                -C dist -czf "draftboard_${TAG}_${GOOS}_${GOARCH}.tar.gz" draftboard
+          done
+          sha256sum draftboard_*.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: publica o lançamento
+        run: |
+          set -euo pipefail
+          FLAGS=(--title "$TAG" --generate-notes)
+          # Tag com "-" é prerelease, e /releases/latest não a devolve: assim
+          # `draftboard update` nunca oferece uma v1.0.0-rc.1.
+          case "$TAG" in *-*) FLAGS+=(--prerelease);; esac
+          gh release create "$TAG" "${FLAGS[@]}" draftboard_*.tar.gz checksums.txt
