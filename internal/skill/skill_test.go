@@ -79,7 +79,7 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"lista de chaves discriminantes":      "Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use`, `slot` ou `control`.",
 		"regra de slot só em Componente":      "- `slot` só é válido dentro de Componente — nunca em Documento.",
 		"nó slot no exemplo de Componente":    "  - slot: \"body\"",
-		"tabela da flag --out":                "| `--out DIR` | `render` | `.` | diretório de saída |",
+		"tabela da flag --out":                "| `--out DIR` | `render`, `board` | `.` | diretório de saída |",
 		"tabela da flag --scale":              "| `--scale N` | `render` | `1` | multiplicador float > 0 de toda a imagem |",
 		"tabela da flag --notes":              "| `--notes MODO` | `render` | `margin` | `margin` (Notas no Chrome), `float` (sobre o Frame), `off` (sem Notas) |",
 		"tabela da flag --layers":             "| `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |",
@@ -90,10 +90,13 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"tabela da flag --no":                 "| `--no` | `skill`, `update` | desligado | responde `n` a qualquer pergunta |",
 		"nome de saída sem --layers":          "| sem `--layers` | `<doc>-<frame>.webp` |",
 		"nome de saída com --layers":          "| com `--layers` | `<doc>-<frame>-<nn>-<camada>.webp`, `nn` de dois dígitos a partir de `01` |",
+		"nome de saída do board":              "| `board` | `<doc>.html` |",
+		"regra da Ligação em Componente":      "- `to` **não é permitido em Componente**: um Componente não conhece Frame.",
+		"regra da Ligação com repeat":         "- `to` **não convive com `repeat`** no mesmo nó: repetir o gatilho não repete a seta.",
 		"fórmula do Círculo no Frame":         "Círculo:  L = A = d/100*FL      (largura nos dois eixos — nunca vira elipse)",
 		"fórmula do Círculo no espaço local":  "Círculo:  L = A = d/100*bl",
-		"linha de Elemento do inspect":        "      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>]",
-		"tabela do nó control":                "| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `repeat`, e os campos do Controle |",
+		"linha de Elemento do inspect":        "      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>]",
+		"tabela do nó control":                "| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `to`, `repeat`, e os campos do Controle |",
 		"regra de Controle fechado":           "- `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.",
 		"catálogo do Controle button":         "| `button` | `label` | sem `label`, o rótulo vira barra cinza |",
 		"catálogo do Controle input":          "| `input` | `label` | sem `label`, o rótulo vira barra cinza |",
@@ -119,8 +122,8 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 
 	// O nó rect é o único que aceita `round`, e circle o único com `d`.
 	for fato, linha := range map[string]string{
-		"tabela do nó rect":   "| `rect: {x, y, w, h}` | geometria em % | `round`, `id`, `note`, `repeat` |",
-		"tabela do nó circle": "| `circle: {x, y, d}` | geometria em % | `id`, `note`, `repeat` |",
+		"tabela do nó rect":   "| `rect: {x, y, w, h}` | geometria em % | `round`, `id`, `note`, `to`, `repeat` |",
+		"tabela do nó circle": "| `circle: {x, y, d}` | geometria em % | `id`, `note`, `to`, `repeat` |",
 	} {
 		if !contemLinha(c, linha) {
 			t.Errorf("skill perdeu a %s; linha esperada:\n%s", fato, linha)

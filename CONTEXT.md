@@ -98,6 +98,21 @@ do desenho: participa da Elevação e aparece no export por Camada. Não é
 Superfície — nada se apoia sobre ele.
 _Avoid_: label, caption, legenda, texto
 
+### Navegação
+
+**Ligação**:
+Relação declarada de um Elemento para um Frame do mesmo Documento: diz que
+aquele Elemento é o gatilho que leva àquela tela. Não faz parte do desenho — não
+participa da Elevação, não tem geometria própria e não aparece na imagem do
+Frame.
+_Avoid_: link, seta, conexão, transição, rota, navegação
+
+**Prancheta**:
+Superfície única que dispõe todos os Frames de um Documento com as Ligações
+desenhadas entre eles. A posição de cada Frame é derivada do grafo de Ligações,
+nunca declarada, e a Prancheta não tem dimensão própria.
+_Avoid_: canvas, board, mapa, fluxo, artboard, quadro
+
 ### Distribuição
 
 **Versão**:

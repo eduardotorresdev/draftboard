@@ -1,0 +1,1 @@
+erro: destino-em-componente.yaml: frames[0].layers[0].elements[0] -> ./peca.yaml: elements[0]: Ligação só pode ser declarada em Documento, não em Componente

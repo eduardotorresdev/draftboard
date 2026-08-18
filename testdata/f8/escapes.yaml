@@ -1,0 +1,9 @@
+frames:
+  - name: 'a & b <script>'
+    w: 320
+    h: 240
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 20}
+            note: 'aspas " e & <tag>'

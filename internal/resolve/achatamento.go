@@ -375,6 +375,7 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		Arredondado: no.Arredondado,
 		Origem:      ctx.origem,
 		Nota:        no.Nota,
+		Destino:     no.Destino,
 	})
 }
 
@@ -496,6 +497,7 @@ func (r *resolucao) controle(no schema.No, esp espaco, caixa schema.Caixa, camin
 		if i == 0 {
 			e.ID = no.ID
 			e.Nota = no.Nota
+			e.Destino = no.Destino
 			e.Detalhe = def.Detalhe(*no.Controle)
 		}
 		if e.X < 0 || e.Y < 0 || e.X+e.L > r.frameL || e.Y+e.A > r.frameA {

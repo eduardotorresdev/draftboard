@@ -1,0 +1,23 @@
+frames:
+  - name: um
+    w: 320
+    h: 240
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 30}
+  - name: dois
+    w: 320
+    h: 240
+    layers:
+      - name: base
+        elements:
+          - circle: {x: 10, y: 10, d: 30}
+  - name: tres
+    w: 320
+    h: 240
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 30}
+            round: true

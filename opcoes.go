@@ -84,6 +84,47 @@ func interpretaRender(args []string) (opcoes, error) {
 	return o, nil
 }
 
+// opcoesBoard são as opções do verbo `board`. A Prancheta não tem escala nem
+// modo de Nota: ela é vetorial, o zoom é do navegador, e a Nota aparece na
+// inspeção em vez de num plano fixo do desenho.
+type opcoesBoard struct {
+	arquivo string
+	// saida é o diretório onde a Prancheta é escrita.
+	saida string
+}
+
+func interpretaBoard(args []string) (opcoesBoard, error) {
+	o := opcoesBoard{saida: "."}
+	var posicionais []string
+	args = expandeIguais(args)
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !ehOpcao(a) {
+			posicionais = append(posicionais, a)
+			continue
+		}
+		switch a {
+		case "--out", "-out":
+			v, err := valorDe(args, &i, a)
+			if err != nil {
+				return o, err
+			}
+			if v == "" {
+				return o, fmt.Errorf("opção %q espera um diretório, encontrou valor vazio", a)
+			}
+			o.saida = v
+		default:
+			return o, fmt.Errorf("opção desconhecida %q", a)
+		}
+	}
+	arquivo, err := unicoArquivo(posicionais)
+	if err != nil {
+		return o, err
+	}
+	o.arquivo = arquivo
+	return o, nil
+}
+
 // interpretaArquivo lê os argumentos de um verbo que só recebe o caminho do
 // Documento.
 func interpretaArquivo(args []string) (string, error) {

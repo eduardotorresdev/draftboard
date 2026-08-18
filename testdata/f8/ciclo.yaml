@@ -1,0 +1,19 @@
+frames:
+  - name: a
+    w: 320
+    h: 240
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 20}
+            to: b
+  - name: b
+    w: 320
+    h: 240
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 20}
+            to: a
+          - rect: {x: 10, y: 40, w: 80, h: 20}
+            to: b

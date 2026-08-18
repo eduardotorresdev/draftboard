@@ -1,0 +1,10 @@
+frames:
+  - name: login
+    w: 320
+    h: 480
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 10}
+            to: login
+            repeat: {n: 3, axis: y, gap: 2}

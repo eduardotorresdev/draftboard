@@ -144,6 +144,10 @@ type Elemento struct {
 	Origem string
 	// Nota é a anotação textual aninhada no Elemento. Vazia quando não há.
 	Nota string
+	// Destino é o nome do Frame para onde a Ligação deste Elemento aponta,
+	// ou "" quando não há Ligação. Como a Nota, não faz parte do desenho: não
+	// entra na Elevação e o rasterizador a ignora. Só a Prancheta a usa.
+	Destino string
 	// Rotulo é o texto desenhado quando Forma é Texto. Vazio nas demais Formas.
 	// Diferente da Nota: o Rótulo vive no plano do desenho e participa da
 	// Elevação; a Nota vive no plano de anotação e não participa.

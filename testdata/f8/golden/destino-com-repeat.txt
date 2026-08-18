@@ -1,0 +1,1 @@
+erro: destino-com-repeat.yaml: frames[0].layers[0].elements[0]: campo "to" não pode ser usado com "repeat"

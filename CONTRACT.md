@@ -26,7 +26,8 @@ Dono de cada diretório (ninguém escreve fora do seu):
 | `internal/notes/` | F4 |
 | `internal/skill/`, `SKILL.md` | F5; **F7 acrescenta apenas `EstaSincronizada`** |
 | `internal/update/`, `.github/workflows/` | F7 |
-| `main.go` | F1 (dispatch + `render`/`inspect`/`validate`); F5 acrescenta só o caso `skill`; F7 acrescenta os casos `version` e `update` e o parâmetro `stdin` de `run` |
+| `internal/board/` | F8 |
+| `main.go` | F1 (dispatch + `render`/`inspect`/`validate`); F5 acrescenta só o caso `skill`; F7 acrescenta os casos `version` e `update` e o parâmetro `stdin` de `run`; F8 acrescenta só o caso `board` |
 | `testdata/` | subdiretório por funcionalidade: `testdata/f1/`, `testdata/f2/`, ... |
 
 ## 1. `internal/scene` — o contrato central
@@ -53,6 +54,7 @@ type Elemento struct {
     Tom         Tom
     Origem      string   // caminho relativo do Componente de origem; "" se inline
     Nota        string   // "" se não há
+    Destino     string   // Ligação: nome do Frame de destino; "" se não há (ver §11)
     Rotulo      string   // texto do Elemento de Forma Texto; "" nas demais Formas
     Controle    string   // nome de catálogo do Controle de origem; "" se não veio de um
     Detalhe     string   // parâmetros do Controle formatados para o inspect; só na cabeça
@@ -121,6 +123,7 @@ Exatamente **uma** das chaves discriminantes: `rect`, `circle`, `use`, `slot`.
   round: true                             # opcional, só em rect
   id: header                              # opcional
   note: "Cabeçalho fixo"                  # opcional
+  to: dashboard                           # opcional; Ligação, só em Documento (ver §11)
   repeat: {n: 3, axis: y, gap: 2}         # opcional
 
 - circle: {x: 8, y: 8, d: 4}              # d em % da LARGURA do espaço, em ambos os eixos
@@ -377,6 +380,7 @@ Notas não participam da Elevação e **não aparecem no export por Camada**.
 
 ```
 draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
+draftboard board    <arquivo.yaml> [--out DIR]
 draftboard inspect  <arquivo.yaml>
 draftboard validate <arquivo.yaml>
 draftboard skill    [--install [DIR]]
@@ -394,6 +398,7 @@ draftboard skill    [--install [DIR]]
 
 ### Nomes de arquivo de saída
 
+- `board`: `<doc>.html` — um arquivo por Documento, não por Frame.
 - Sem `--layers`: `<doc>-<frame>.webp`
 - Com `--layers`: `<doc>-<frame>-<nn>-<camada>.webp`, `nn` de dois dígitos a partir de `01`.
 - `<doc>` é o nome do arquivo sem diretório e sem extensão. Todo componente do nome passa
@@ -534,3 +539,94 @@ linha desta tabela quebra o updater das versões já instaladas.
   corrupção e truncamento, **não** contra Lançamento comprometido. Assinatura de
   verdade exigiria dependência nova (minisign, cosign) ou shell-out, e as duas coisas
   são proibidas pelo §0.
+
+## 11. Ligações e Prancheta (adendo, dono F8)
+
+Duas coisas novas, e uma reversão explícita: o PRD original listava "links entre
+Frames" como fora de escopo. A fatia reverte essa exclusão; a exclusão de outros
+**formatos de imagem** continua de pé.
+
+### Mudanças aditivas em contratos congelados
+
+Três, todas por acréscimo — nenhuma assinatura existente mudou:
+
+| Onde | O quê | Por quê |
+| --- | --- | --- |
+| `scene.Elemento` | campo `Destino string` | a Ligação é do Elemento, e o modelo resolvido é o único lugar por onde ela chega à Prancheta |
+| `internal/render` | `func Raio(l, a float64) float64` | a regra do canto arredondado passa a ter um dono só: raster e SVG não podem divergir |
+| `internal/render` | `func TamanhoDoRotulo(a float64) float64` | mesma razão, para a altura da fonte do Rótulo |
+
+`internal/render` **não muda de comportamento**: `Destino` é ignorado no raster.
+Acrescentar `to` a um Documento não altera nenhum byte do WebP dele.
+
+### A chave `to`
+
+```yaml
+- control: button
+  box: {x: 4, y: 40, w: 18, h: 7}
+  label: "Entrar"
+  to: dashboard
+```
+
+Regras, todas **erro**:
+
+| Situação | Mensagem |
+| --- | --- |
+| destino que não é `name` de nenhum Frame do Documento | `Ligação para Frame desconhecido "x"; você quis dizer "y"?` (sugestão quando há nome próximo) |
+| `to` em Componente | `Ligação só pode ser declarada em Documento, não em Componente` |
+| `to` em `use` ou `slot` | `campo "to" só é permitido em Retângulo, Círculo ou Controle` |
+| `to` junto de `repeat` | `campo "to" não pode ser usado com "repeat"` |
+| `to` vazio | `Ligação sem nome de Frame em "to"` |
+
+`to` em `use`/`slot` é recusado porque nenhum dos dois deixa um Elemento seu na
+cena: eles viram o conteúdo que expandiram, e a seta não teria de onde sair.
+Ligar um Frame a si mesmo é válido. Nome de Frame repetido resolve pelo primeiro.
+
+O `Destino` mora no mesmo lugar que o `ID` e a `Nota`: no Elemento do `rect`/
+`circle`, e na **cabeça** do Controle.
+
+### `inspect`
+
+A linha do Elemento ganha ` para=<frame>` no fim, depois de `<parâmetros>`.
+
+### `internal/board`
+
+```go
+const LimiteDeElementos = 50_000
+func Elementos(d *scene.Documento) int
+func Escreve(w io.Writer, d *scene.Documento) error
+```
+
+- A saída é **determinística**: mesmo Documento, mesmos bytes.
+- **Autocontida**: CSS e JS inline, zero requisição de rede, zero arquivo ao
+  lado. Abre por `file://`. O único endereço no arquivo é o espaço de nomes do
+  SVG.
+- Todo texto vindo do YAML é escapado antes de entrar no documento.
+- A CLI recusa o Documento acima de `LimiteDeElementos` **antes** de montar o
+  HTML e antes de criar o diretório de saída, no mesmo desenho de `cabeNaTela`.
+
+### Layout (derivado, nunca declarado)
+
+Não existe campo de posição de Frame, pela mesma razão que não existe campo de
+Tom. A coluna de um Frame é a **distância mais curta** até uma tela de entrada
+(Frame sem Ligação de entrada), por busca em largura na ordem de declaração:
+
+- A distância é a mais curta, não a mais longa: quase todo fluxo tem Ligação de
+  volta, e o caminho mais longo jogaria a tela de entrada para o fim.
+- Fluxo inteiramente em ciclo não tem tela de entrada: a primeira declarada é a
+  entrada.
+- Trecho desligado do grafo recomeça na coluna 0.
+- Documento sem Ligação nenhuma vira grade de `ceil(sqrt(n))` colunas.
+- Auto-Ligação não conta como entrada e não move o Frame.
+
+### Desenho
+
+Os Frames são SVG gerado a partir de `scene.Documento`, com a mesma escala de
+Tom, o mesmo raio de canto e o mesmo tamanho de Rótulo do raster. O que **não** é
+igual ao WebP: a fonte, que na Prancheta é a pilha do sistema e não a `goregular`
+embutida. Consequência aceita — embutir a fonte inflaria o arquivo por um ganho
+que não é o propósito da Prancheta.
+
+As peças internas de um Controle são desenhadas (elas existem no desenho) mas não
+recebem clique: quem clica num Controle seleciona o Controle, nunca o seu miolo.
+O Controle é fechado também na Prancheta.

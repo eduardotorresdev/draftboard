@@ -1,0 +1,29 @@
+documento fluxo
+  frame login 480x720
+    camada conteudo
+      e0 retangulo 48,58 384x43 tom=300 elev=1
+      e1 retangulo 48,173 384x50 tom=300 elev=1 round controle=input rotulo="E-mail"
+      e2 retangulo 48,245 384x50 tom=300 elev=1 round controle=input rotulo="Senha"
+      e3 retangulo 48,331 384x58 tom=300 elev=1 round controle=button rotulo="Entrar" para=dashboard
+        nota: Leva ao painel quando as credenciais valem
+      e4 retangulo 144,432 192x22 tom=300 elev=1 para=recuperar
+  frame dashboard 1280x800
+    camada casca
+      e0 retangulo 0,0 1280x64 tom=300 elev=1
+      e1 retangulo 0,64 230x736 tom=300 elev=1
+    camada conteudo
+      e0~2 retangulo 282,96 947x40 tom=700 elev=3 controle=tabs itens=[Resumo, Times, Contas] ativo=1
+      cartao retangulo 282,176 448x160 tom=700 elev=3 round para=detalhe
+      e2 retangulo 781,176 448x160 tom=700 elev=3 round
+      e3 retangulo 1101,16 154x32 tom=700 elev=3 round controle=button rotulo="Sair" para=login
+  frame detalhe 1280x800
+    camada conteudo
+      e0 retangulo 0,0 1280x64 tom=300 elev=1
+      e1 retangulo 77,112 1126x320 tom=300 elev=1 round
+        nota: Painel do item selecionado
+      e2 retangulo 77,480 179x40 tom=300 elev=1 round controle=button rotulo="Voltar" para=dashboard
+  frame recuperar 480x720
+    camada conteudo
+      e0 retangulo 48,72 384x43 tom=300 elev=1
+      e1 retangulo 48,173 384x50 tom=300 elev=1 round controle=input rotulo="E-mail"
+      e2 retangulo 48,259 384x58 tom=300 elev=1 round controle=button rotulo="Enviar" para=login

@@ -348,14 +348,22 @@ func DesenhaFrame(f scene.Frame, escala float64, margemT, margemD, margemB, marg
 	return c
 }
 
-// raio devolve o raio de canto de um Retângulo arredondado, em px de
-// dispositivo. Ver raioBase e raioFracaoMaxima.
-func (c *Canvas) raio(e scene.Elemento) float64 {
+// Raio devolve o raio de canto de um Retângulo arredondado de l por a, em px do
+// espaço do Frame — antes de qualquer fator de escala. É exportada porque a
+// Prancheta desenha os mesmos Retângulos em SVG: a regra do canto vive num
+// lugar só, e raster e vetor nunca divergem. Ver raioBase e raioFracaoMaxima.
+func Raio(l, a float64) float64 {
 	r := raioBase
-	if limite := math.Min(e.L, e.A) * raioFracaoMaxima; limite < r {
+	if limite := math.Min(l, a) * raioFracaoMaxima; limite < r {
 		r = limite
 	}
-	return r * c.escala
+	return r
+}
+
+// raio devolve o raio de canto de um Retângulo arredondado, em px de
+// dispositivo.
+func (c *Canvas) raio(e scene.Elemento) float64 {
+	return Raio(e.L, e.A) * c.escala
 }
 
 // retanguloDoFrame devolve o retângulo do Frame na tela, em px de dispositivo.

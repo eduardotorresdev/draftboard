@@ -120,6 +120,9 @@ type No struct {
 	ID string
 	// Nota é a anotação textual aninhada, ou "" quando ausente.
 	Nota string
+	// Destino é o nome do Frame para onde a Ligação aponta, ou "" quando o
+	// nó não declara Ligação.
+	Destino string
 	// Retangulo é a geometria de um nó TipoRetangulo.
 	Retangulo *Caixa
 	// Circulo é a geometria de um nó TipoCirculo.

@@ -22,7 +22,7 @@ var (
 	chavesDoComponente    = []string{"elements"}
 	chavesDoFrame         = []string{"name", "w", "h", "layers"}
 	chavesDaCamada        = []string{"name", "elements"}
-	chavesDoNo            = []string{"rect", "circle", "use", "slot", "control", "round", "id", "note", "repeat", "box", "slots", "default", "label", "items", "active", "value"}
+	chavesDoNo            = []string{"rect", "circle", "use", "slot", "control", "round", "id", "note", "to", "repeat", "box", "slots", "default", "label", "items", "active", "value"}
 	chavesDaCaixa         = []string{"x", "y", "w", "h"}
 	chavesDoDisco         = []string{"x", "y", "d"}
 	chavesDaRepeticao     = []string{"n", "axis", "gap"}
@@ -138,7 +138,51 @@ func (l *leitor) documento(raiz *yaml.Node, caminho string) (*Documento, error) 
 		}
 		d.Frames = append(d.Frames, f)
 	}
+	if err := l.validaDestinos(d); err != nil {
+		return nil, err
+	}
 	return d, nil
+}
+
+// validaDestinos confere que toda Ligação aponta para um Frame declarado no
+// mesmo Documento. Roda depois do laço de Frames porque um `to` pode apontar
+// para frente: a tela de destino não precisa vir antes do gatilho no arquivo.
+func (l *leitor) validaDestinos(d *Documento) error {
+	nomes := make([]string, 0, len(d.Frames))
+	declarados := make(map[string]bool, len(d.Frames))
+	for _, f := range d.Frames {
+		nomes = append(nomes, f.Nome)
+		declarados[f.Nome] = true
+	}
+	var confere func(nos []No) error
+	confere = func(nos []No) error {
+		for _, no := range nos {
+			if no.Destino != "" && !declarados[no.Destino] {
+				msg := fmt.Sprintf("Ligação para Frame desconhecido %q", no.Destino)
+				if s := sugestao(no.Destino, nomes); s != "" {
+					msg += fmt.Sprintf("; você quis dizer %q?", s)
+				}
+				return l.erro(no.Local, "%s", msg)
+			}
+			if err := confere(no.Padrao); err != nil {
+				return err
+			}
+			for _, nome := range no.OrdemDosPreenchimentos {
+				if err := confere(no.Preenchimentos[nome].Elementos); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	for _, f := range d.Frames {
+		for _, c := range f.Camadas {
+			if err := confere(c.Elementos); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (l *leitor) componente(raiz *yaml.Node, caminho string) (*Componente, error) {
@@ -296,6 +340,33 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 	}
 	if no.Nota, err = l.texto(m, "note"); err != nil {
 		return No{}, err
+	}
+
+	if m.valores["to"] != nil {
+		// A Ligação aponta para um Frame, e Componente não conhece Frame: o
+		// mesmo arquivo instanciado em dois Documentos apontaria para telas
+		// diferentes, ou para nenhuma.
+		if !l.emDocumento {
+			return No{}, l.erro(local, "Ligação só pode ser declarada em Documento, não em Componente")
+		}
+		// A Ligação sai da borda de um Elemento, e Instância e Slot não
+		// deixam nenhum Elemento seu no Documento resolvido: eles viram o
+		// conteúdo que expandiram. Sem Elemento não há de onde a seta sair.
+		if no.Tipo == TipoInstancia || no.Tipo == TipoSlot {
+			return No{}, l.erro(local, `campo "to" só é permitido em Retângulo, Círculo ou Controle`)
+		}
+		// Repetir o gatilho não repete a Ligação: N setas idênticas saindo de
+		// clones empilhados não comunicam nada, e escolher um clone seria
+		// arbitrário.
+		if m.valores["repeat"] != nil {
+			return No{}, l.erro(local, `campo "to" não pode ser usado com "repeat"`)
+		}
+		if no.Destino, err = l.texto(m, "to"); err != nil {
+			return No{}, err
+		}
+		if no.Destino == "" {
+			return No{}, l.erro(local, `Ligação sem nome de Frame em "to"`)
+		}
 	}
 
 	if m.valores["round"] != nil {

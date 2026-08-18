@@ -1,0 +1,73 @@
+frames:
+  - name: login
+    w: 480
+    h: 720
+    layers:
+      - name: conteudo
+        elements:
+          - rect: {x: 10, y: 8, w: 80, h: 6}
+          - control: input
+            box: {x: 10, y: 24, w: 80, h: 7}
+            label: "E-mail"
+          - control: input
+            box: {x: 10, y: 34, w: 80, h: 7}
+            label: "Senha"
+          - control: button
+            box: {x: 10, y: 46, w: 80, h: 8}
+            label: "Entrar"
+            to: dashboard
+            note: "Leva ao painel quando as credenciais valem"
+          - rect: {x: 30, y: 60, w: 40, h: 3}
+            to: recuperar
+  - name: dashboard
+    w: 1280
+    h: 800
+    layers:
+      - name: casca
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 8}
+          - rect: {x: 0, y: 8, w: 18, h: 92}
+      - name: conteudo
+        elements:
+          - control: tabs
+            box: {x: 22, y: 12, w: 74, h: 5}
+            items: ["Resumo", "Times", "Contas"]
+            active: 1
+          - rect: {x: 22, y: 22, w: 35, h: 20}
+            round: true
+            id: cartao
+            to: detalhe
+          - rect: {x: 61, y: 22, w: 35, h: 20}
+            round: true
+          - control: button
+            box: {x: 86, y: 2, w: 12, h: 4}
+            label: "Sair"
+            to: login
+  - name: detalhe
+    w: 1280
+    h: 800
+    layers:
+      - name: conteudo
+        elements:
+          - rect: {x: 0, y: 0, w: 100, h: 8}
+          - rect: {x: 6, y: 14, w: 88, h: 40}
+            round: true
+            note: "Painel do item selecionado"
+          - control: button
+            box: {x: 6, y: 60, w: 14, h: 5}
+            label: "Voltar"
+            to: dashboard
+  - name: recuperar
+    w: 480
+    h: 720
+    layers:
+      - name: conteudo
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 6}
+          - control: input
+            box: {x: 10, y: 24, w: 80, h: 7}
+            label: "E-mail"
+          - control: button
+            box: {x: 10, y: 36, w: 80, h: 8}
+            label: "Enviar"
+            to: login

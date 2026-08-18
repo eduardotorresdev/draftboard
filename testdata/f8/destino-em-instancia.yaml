@@ -1,0 +1,10 @@
+frames:
+  - name: login
+    w: 320
+    h: 480
+    layers:
+      - name: base
+        elements:
+          - use: "./peca.yaml"
+            box: {x: 10, y: 10, w: 80, h: 20}
+            to: login

@@ -156,6 +156,13 @@ func metricas(f font.Face) (subida, altura float64) {
 // derivado da estrutura, nunca declarado, pela mesma razão que o Tom é.
 const fracaoDoRotulo = 0.45
 
+// TamanhoDoRotulo devolve a altura da fonte do Rótulo de um Elemento de altura
+// a, em px do espaço do Frame. É exportada pela mesma razão que Raio: a
+// Prancheta desenha o mesmo Rótulo em SVG e não pode ter uma segunda regra.
+func TamanhoDoRotulo(a float64) float64 {
+	return fracaoDoRotulo * a
+}
+
 // desenhaRotulo pinta o Rótulo de um Elemento de Forma Texto dentro da área do
 // próprio Elemento, no espaço do Frame. As coordenadas chegam já em px de
 // dispositivo.

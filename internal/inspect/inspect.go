@@ -56,6 +56,9 @@ func linhaDoElemento(e scene.Elemento) string {
 	if e.Detalhe != "" {
 		linha += " " + e.Detalhe
 	}
+	if e.Destino != "" {
+		linha += " para=" + e.Destino
+	}
 	return linha
 }
 

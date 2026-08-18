@@ -28,6 +28,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "render":
 		return comandoRender(args[1:], stdout, stderr)
+	case "board":
+		return comandoBoard(args[1:], stdout, stderr)
 	case "inspect":
 		return comandoInspect(args[1:], stdout, stderr)
 	case "validate":
@@ -51,6 +53,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func imprimeUso(w io.Writer) {
 	fmt.Fprint(w, `uso:
   draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
+  draftboard board    <arquivo.yaml> [--out DIR]
   draftboard inspect  <arquivo.yaml>
   draftboard validate <arquivo.yaml>
   draftboard skill    [--install [DIR]] [--sync [DIR]] [--yes] [--no]

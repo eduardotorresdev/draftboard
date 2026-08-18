@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/eduardotorresdev/draftboard/internal/board"
 	"github.com/eduardotorresdev/draftboard/internal/inspect"
 	"github.com/eduardotorresdev/draftboard/internal/notes"
 	"github.com/eduardotorresdev/draftboard/internal/render"
@@ -117,6 +118,65 @@ func escreveWebP(caminho string, tela *render.Canvas) error {
 	}
 	if err := arquivo.Close(); err != nil {
 		return &scene.Erro{Arquivo: caminho, Msg: "não foi possível fechar a imagem"}
+	}
+	return nil
+}
+
+// comandoBoard resolve o Documento e escreve a Prancheta: um arquivo HTML só,
+// com todos os Frames e as Ligações entre eles. Só o caminho escrito vai para o
+// stdout, como no render.
+func comandoBoard(args []string, stdout, stderr io.Writer) int {
+	o, err := interpretaBoard(args)
+	if err != nil {
+		return usoInvalido(stderr, err)
+	}
+	doc, avisos, err := resolve.Arquivo(o.arquivo)
+	imprimeAvisos(stderr, avisos)
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	if err := cabeNoNavegador(o.arquivo, doc); err != nil {
+		return imprimeErro(stderr, err)
+	}
+	if err := os.MkdirAll(o.saida, 0o755); err != nil {
+		fmt.Fprintf(stderr, "erro: não foi possível criar o diretório de saída %q\n", o.saida)
+		return 1
+	}
+	caminho := filepath.Join(o.saida, slug(doc.Nome)+".html")
+	if err := escrevePrancheta(caminho, doc); err != nil {
+		return imprimeErro(stderr, err)
+	}
+	fmt.Fprintln(stdout, caminho)
+	return 0
+}
+
+// cabeNoNavegador recusa, antes de montar qualquer HTML, o Documento cuja
+// Prancheta teria mais nós do que um navegador aguenta. Cada Elemento vira um
+// nó do DOM, e o teto é da Prancheta inteira — não de um Frame.
+func cabeNoNavegador(arquivo string, doc *scene.Documento) error {
+	n := board.Elementos(doc)
+	if n <= board.LimiteDeElementos {
+		return nil
+	}
+	return &scene.Erro{
+		Arquivo: arquivo,
+		Msg: fmt.Sprintf(
+			"a Prancheta teria %d Elementos, acima do limite de %d; separe o fluxo em mais de um Documento",
+			n, board.LimiteDeElementos),
+	}
+}
+
+func escrevePrancheta(caminho string, doc *scene.Documento) error {
+	arquivo, err := os.Create(caminho)
+	if err != nil {
+		return &scene.Erro{Arquivo: caminho, Msg: "não foi possível criar a Prancheta"}
+	}
+	if err := board.Escreve(arquivo, doc); err != nil {
+		arquivo.Close()
+		return &scene.Erro{Arquivo: caminho, Msg: "não foi possível escrever a Prancheta: " + err.Error()}
+	}
+	if err := arquivo.Close(); err != nil {
+		return &scene.Erro{Arquivo: caminho, Msg: "não foi possível fechar a Prancheta"}
 	}
 	return nil
 }

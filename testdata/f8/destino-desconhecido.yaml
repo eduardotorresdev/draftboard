@@ -1,0 +1,16 @@
+frames:
+  - name: login
+    w: 320
+    h: 480
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 10}
+            to: dashbord
+  - name: dashboard
+    w: 320
+    h: 480
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 10, y: 10, w: 80, h: 10}

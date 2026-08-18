@@ -1,0 +1,1 @@
+erro: destino-em-instancia.yaml: frames[0].layers[0].elements[0]: campo "to" só é permitido em Retângulo, Círculo ou Controle

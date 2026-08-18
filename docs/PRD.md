@@ -72,6 +72,26 @@ versão limpa e a versão anotada.
    duas vezes o mesmo arquivo produza bytes idênticos e o diff em Git seja
    confiável.
 
+### Fluxo entre telas
+
+Um Documento com vários Frames descreve um fluxo, mas a imagem por Frame não
+mostra o fluxo — mostra as telas soltas. As duas histórias abaixo cobrem essa
+lacuna e revertem, deliberadamente, a exclusão de "links entre Frames" que o
+escopo original carregava.
+
+- Como agente, quero declarar que um Elemento leva a um Frame (`to`), para que o
+  gatilho de cada transição fique escrito ao lado do que o dispara.
+- Como agente, quero que a árvore do `inspect` diga para onde cada gatilho leva,
+  para que eu leia a navegação inteira sem gastar visão.
+- Como usuário, quero uma superfície única com todas as telas e as setas entre
+  elas — a Prancheta —, para que eu discuta o fluxo sem abrir dez imagens.
+- Como usuário, quero navegar essa superfície com pan e zoom e clicar num
+  Elemento para ver o que ele é, para que a imagem deixe de ser opaca.
+- Como usuário, quero que a Prancheta seja um arquivo só que abre sem servidor e
+  sem rede, para que eu a mande por anexo como mando a imagem.
+- Como agente, quero que a Ligação não mexa no desenho, para que acrescentar
+  fluxo a um Documento não mude nenhuma imagem já gerada.
+
 ### Geometria
 
 9. Como agente, quero posicionar todo Elemento em porcentagem do Frame, para que
@@ -441,7 +461,10 @@ e testá-los congela decisões que devem permanecer livres.
 
 ## Out of Scope
 
-- **Outros formatos de saída** (PNG, SVG, PDF). Só WebP no v1.
+- **Outros formatos de imagem** (PNG, SVG, PDF) como export de Frame. A imagem de
+  um Frame é WebP e só. O SVG da Prancheta não é exceção a isso: ele é o meio de
+  desenhar dentro do HTML, não um arquivo de imagem que se possa pedir por
+  Frame.
 - **Auto-layout** (stack, flex, grid, alinhamento automático). Contradiz o
   princípio de posicionamento absoluto e é a maior fonte de complexidade
   possível neste domínio.
@@ -450,7 +473,9 @@ e testá-los congela decisões que devem permanecer livres.
   mockup.
 - **Ícones e imagens.**
 - **Cores fora da escala de cinza**, temas, e qualquer controle direto de cor.
-- **Estados interativos**, protótipo navegável, links entre Frames.
+- **Estados interativos** — um Elemento não tem estado que mude por interação, e
+  a Prancheta navega entre telas prontas em vez de simular o comportamento
+  delas.
 - **Modo watch** e qualquer observação de sistema de arquivos.
 - **Contorno / stroke** em qualquer forma. Superfícies se separam por contraste.
 - **Elipse** como primitiva.

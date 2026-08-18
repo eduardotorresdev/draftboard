@@ -1,6 +1,6 @@
 ---
 name: draftboard
-description: Use ao escrever, validar ou renderizar wireframes declarativos em YAML com o binário draftboard, que produz imagens WebP em escala de cinza e uma árvore textual da estrutura.
+description: Use ao escrever, validar ou renderizar wireframes declarativos em YAML com o binário draftboard, que produz imagens WebP em escala de cinza, uma Prancheta HTML navegável do fluxo e uma árvore textual da estrutura.
 ---
 
 # draftboard
@@ -100,17 +100,18 @@ Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use`, `slot` 
 
 | Nó | Valor | Chaves adicionais permitidas |
 | --- | --- | --- |
-| `rect: {x, y, w, h}` | geometria em % | `round`, `id`, `note`, `repeat` |
-| `circle: {x, y, d}` | geometria em % | `id`, `note`, `repeat` |
+| `rect: {x, y, w, h}` | geometria em % | `round`, `id`, `note`, `to`, `repeat` |
+| `circle: {x, y, d}` | geometria em % | `id`, `note`, `to`, `repeat` |
 | `use: "./comp.yaml"` | caminho relativo | `box` (**obrigatório**), `slots`, `id`, `note`, `repeat` |
 | `slot: "nome"` | nome do Slot | `box` (**obrigatório**), `default`, `id`, `note`, `repeat` |
-| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `repeat`, e os campos do Controle |
+| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `to`, `repeat`, e os campos do Controle |
 
 - `round: true` só existe em `rect`. Cantos retos é o padrão.
 - `slots` só existe em `use`. `default` (lista de nós) só existe em `slot`.
 - `slot` só é válido dentro de Componente — nunca em Documento.
 - `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.
 - `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); some inteira com `--notes off`.
+- `to` é a Ligação: o nome do Frame para onde este Elemento leva. Só aparece na Prancheta (`board`) e na árvore do `inspect` — **não muda o desenho nem a Elevação**, e a imagem WebP sai igual com e sem ele.
 - `id` renomeia o segmento do Elemento no caminho da árvore.
 - Toda chave desconhecida, em qualquer nível, é erro com sugestão da chave próxima.
 
@@ -156,6 +157,49 @@ parâmetros declarados. O que ele materializa por dentro não aparece na árvore
 - O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de
   fonte, de alinhamento nem de cor**, pela mesma razão que não existe campo de Tom.
 - Rótulo que não cabe é recortado na área do Controle.
+
+## Ligações e Prancheta
+
+`to` liga um Elemento a um Frame do mesmo Documento: é o gatilho que leva àquela tela.
+`draftboard board` reúne todos os Frames numa **Prancheta** — um HTML autocontido, com
+as Ligações desenhadas entre as telas, que se navega com pan/zoom e onde clicar num
+Elemento mostra caminho, geometria, Elevação, Tom e Nota.
+
+```yaml
+frames:
+  - name: login
+    w: 480
+    h: 720
+    layers:
+      - name: conteudo
+        elements:
+          - control: button
+            box: {x: 10, y: 46, w: 80, h: 8}
+            label: "Entrar"
+            to: dashboard
+  - name: dashboard
+    w: 1280
+    h: 800
+    layers:
+      - name: conteudo
+        elements:
+          - control: button
+            box: {x: 86, y: 2, w: 12, h: 4}
+            label: "Sair"
+            to: login
+```
+
+`draftboard board fluxo.yaml` escreve `fluxo.html`.
+
+Regras:
+
+- O valor de `to` é o `name` de um Frame do mesmo Documento. Nome desconhecido é erro, com sugestão do nome próximo.
+- `to` **não é permitido em Componente**: um Componente não conhece Frame.
+- `to` **não é permitido em `use` nem em `slot`**: só em `rect`, `circle` e `control`, que são os que deixam um Elemento no Documento resolvido.
+- `to` **não convive com `repeat`** no mesmo nó: repetir o gatilho não repete a seta.
+- Ligar um Frame a si mesmo é válido e vira um laço.
+- A posição dos Frames na Prancheta é automática — não existe campo de posição. Frames sem Ligação de entrada ficam na primeira coluna, e cada Ligação empurra o destino uma coluna à direita.
+- A Prancheta não busca nada de fora: abre por `file://`, sem rede e sem arquivo ao lado.
 
 ## Geometria
 
@@ -208,6 +252,7 @@ Consequência prática: para dar contraste a um Elemento, **aninhe-o** dentro de
 
 ```
 draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
+draftboard board    <arquivo.yaml> [--out DIR]
 draftboard inspect  <arquivo.yaml>
 draftboard validate <arquivo.yaml>
 draftboard skill    [--install [DIR]] [--sync [DIR]] [--yes] [--no]
@@ -217,7 +262,7 @@ draftboard update   [--check] [--yes] [--no]
 
 | Flag | Verbo | Padrão | Efeito |
 | --- | --- | --- | --- |
-| `--out DIR` | `render` | `.` | diretório de saída |
+| `--out DIR` | `render`, `board` | `.` | diretório de saída |
 | `--scale N` | `render` | `1` | multiplicador float > 0 de toda a imagem |
 | `--notes MODO` | `render` | `margin` | `margin` (Notas no Chrome), `float` (sobre o Frame), `off` (sem Notas) |
 | `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |
@@ -228,6 +273,7 @@ draftboard update   [--check] [--yes] [--no]
 | `--no` | `skill`, `update` | desligado | responde `n` a qualquer pergunta |
 
 - `render` imprime no stdout **apenas os caminhos escritos**, um por linha, na ordem de geração.
+- `board` escreve **um** arquivo, a Prancheta do Documento inteiro, e imprime só o caminho dele no stdout. Não aceita `--scale` nem `--notes`: a Prancheta é vetorial e mostra a Nota na inspeção.
 - `inspect` imprime a árvore no stdout e **não escreve nada em disco**.
 - `validate` não imprime nada no stdout quando passa.
 - `skill` sem `--install` imprime a skill no stdout.
@@ -244,6 +290,7 @@ draftboard update   [--check] [--yes] [--no]
 | --- | --- |
 | sem `--layers` | `<doc>-<frame>.webp` |
 | com `--layers` | `<doc>-<frame>-<nn>-<camada>.webp`, `nn` de dois dígitos a partir de `01` |
+| `board` | `<doc>.html` |
 
 `<doc>` é o nome do arquivo sem diretório e sem extensão. Todo componente do nome passa
 por slug: minúsculas, cada sequência fora de `[a-z0-9]` vira um `-` único, `-` das pontas
@@ -257,7 +304,7 @@ Indentação de 2 espaços por nível; coordenadas arredondadas para inteiro.
 documento <nome>
   frame <nome> <L>x<A>
     camada <nome>
-      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>]
+      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>]
         nota: <texto>
 ```
 
@@ -265,7 +312,7 @@ documento <nome>
 lista, ou o `id` declarado quando houver. Uma Instância acrescenta um segmento por nível
 de Componente; um Slot acrescenta o segmento com o nome do Slot.
 Exemplos: `e0`, `header`, `e3/e1`, `e3/body/e0`. `de=` só aparece para Elementos vindos
-de Componente.
+de Componente. `para=` só aparece para Elementos que declaram Ligação.
 
 ## Erros × avisos
 
