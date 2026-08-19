@@ -688,6 +688,57 @@ largo demais, que F11 não diagnostica (item 15).
 
       não acha nada.
 
+#### 21. Emenda — o respiro volta por valor, não por diferença
+
+`posiciona` satura a largura da área do Rótulo em `max(0, dono.L - 2*respiro)`.
+Num Retângulo mais estreito que `2 * respiroDoRotulo`, a diferença observada
+`dono.L - rotulo.L` vale `dono.L`, e não `2 * respiroDoRotulo`: o `w` sugerido
+sai curto e o conserto não conserta de primeira.
+
+Medido: `rect: {x:0, y:0, w:2, h:20}` com `label: "Config"` num Frame de 400 px
+→ `w 2 → 12`, e na **mesma chamada** um Aviso novo pedindo `w: 13`.
+
+Congelado: `resolve.RespiroDoRotulo` é exportado, e a conta é
+
+    necessarioNoRetangulo := largura + 2*resolve.RespiroDoRotulo
+
+#### 22. Emenda — a régua do diagnóstico mede sem hinting
+
+`HintingFull` arredonda o avanço de cada glifo para o pixel de dispositivo. A
+12,6 px — o tamanho máximo do Rótulo de Retângulo — isso subestima o que a
+rasterização pinta em escalas maiores, e o `--fix` declara consertado um Rótulo
+que a imagem continua cortando.
+
+Medido, largura em px do espaço do Frame de vinte `l` a 12,6 px:
+
+| escala | `HintingFull` | `HintingNone` |
+| --- | --- | --- |
+| 1 | 60,000 | 67,500 |
+| 3 | 66,667 | 67,396 |
+| 8 | 67,500 | 67,422 |
+| 20 | 67,000 | 67,438 |
+
+A medida com hinting na escala 1 erra 7,5 px; sem hinting, o erro contra
+qualquer escala fica abaixo de 0,1 px, e o `Ceil` do `w` para porcento inteiro
+já dá folga maior que isso.
+
+Congelado: `render` publica a medida do diagnóstico com `font.HintingNone`, e
+`diag` a usa. A régua continua sendo de escala 1 e o diagnóstico continua sendo
+do Documento — o avanço ideal é justamente o que não depende da escala. A
+rasterização **não** muda: quem pinta continua com `HintingFull`, que é o que dá
+traço nítido em tamanho pequeno.
+
+#### 23. Emenda — o teto da fonte é limite declarado, não perseguido
+
+Acima de `TamanhoDoRotulo(A) * escala > limiteDaFonte` (256 px de dispositivo,
+isto é, `--scale` acima de ~20), `render.face` satura a fonte e pinta um Rótulo
+menor do que a régua descreve: o Aviso passa a apontar um corte que naquela
+escala não acontece.
+
+Não se persegue: a régua é do Documento, e a saturação é uma guarda de memória
+da rasterização, não uma propriedade do desenho declarado. Fica **escrito** na
+tabela de diagnóstico da SKILL.md, como limite conhecido.
+
 ## Gate
 
 Local, sem CI de teste:
