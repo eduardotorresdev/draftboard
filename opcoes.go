@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/eduardotorresdev/draftboard/internal/notes"
 )
 
 // opcoes são as opções de `render` já interpretadas.
@@ -17,8 +15,9 @@ type opcoes struct {
 	saida string
 	// escala multiplica as dimensões declaradas do Frame.
 	escala float64
-	// notas é o modo de exibição das Notas.
-	notas notes.Modo
+	// notas liga o desenho das Notas. Desligado por padrão: a imagem sai
+	// limpa e a anotação é pedida quando se quer.
+	notas bool
 	// camadas liga o export por Camada, cumulativo.
 	camadas bool
 }
@@ -26,9 +25,9 @@ type opcoes struct {
 // interpretaRender lê as opções de `render`. O arquivo do Documento pode vir
 // antes ou depois das opções.
 func interpretaRender(args []string) (opcoes, error) {
-	o := opcoes{saida: ".", escala: 1, notas: notes.Margem}
+	o := opcoes{saida: ".", escala: 1}
 	var posicionais []string
-	args = expandeIguais(args)
+	args, colado := expandeIguais(args)
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if !ehOpcao(a) {
@@ -56,20 +55,26 @@ func interpretaRender(args []string) (opcoes, error) {
 			}
 			o.escala = f
 		case "--notes", "-notes":
-			v, err := valorDe(args, &i, a)
-			if err != nil {
-				return o, err
+			// A opção não tem mais valor, mas quem já escreveu `--notes
+			// off` merece saber o que mudou em vez de ver o comando
+			// reclamar de um argumento em excesso. Na forma solta só os
+			// três nomes aposentados são consumidos: qualquer outra
+			// coisa depois de `--notes` é o caminho do Documento ou a
+			// próxima opção.
+			if i+1 < len(args) && modoAposentado(args[i+1]) {
+				i++
+				return o, errors.New(erroDeModoDeNota)
 			}
-			switch v {
-			case "margin":
-				o.notas = notes.Margem
-			case "float":
-				o.notas = notes.Flutuante
-			case "off":
-				o.notas = notes.Desligado
-			default:
-				return o, fmt.Errorf("opção %q espera margin, float ou off, encontrou %q", a, v)
+			// Na forma `=`, porém, o valor é da opção, não do comando:
+			// deixá-lo escorrer para os posicionais fazia
+			// `--notes=true doc.yaml` culpar o Documento por um
+			// "argumento em excesso" e `--notes=` reclamar de um
+			// arquivo sem nome. O valor vazio é indistinguível de
+			// qualquer outro aqui, porque a opção não aceita nenhum.
+			if colado[i] {
+				return o, fmt.Errorf(erroDeValorEmNotas, args[i+1])
 			}
+			o.notas = true
 		case "--layers", "-layers":
 			o.camadas = true
 		default:
@@ -84,6 +89,22 @@ func interpretaRender(args []string) (opcoes, error) {
 	return o, nil
 }
 
+// erroDeModoDeNota é a mensagem de migração dos modos de Nota aposentados. Diz
+// as duas saídas — com balões e sem Notas — porque o padrão mudou junto: quem
+// passava `--notes off` já está no padrão novo e não precisa de opção nenhuma.
+const erroDeModoDeNota = `opção "--notes" não aceita mais valor: os modos margin, float e off acabaram; use "--notes" sozinho para os balões flutuantes, ou omita a opção para renderizar sem Notas`
+
+// erroDeValorEmNotas é a recusa da forma `--notes=VALOR`, para o valor que não
+// é um dos modos aposentados: ali o erro não é a migração, é a opção ter
+// deixado de aceitar valor.
+const erroDeValorEmNotas = `opção "--notes" não aceita valor, encontrou %q; use "--notes" sozinho para os balões flutuantes, ou omita a opção para renderizar sem Notas`
+
+// modoAposentado reporta se o argumento é um dos três modos que `--notes`
+// aceitava.
+func modoAposentado(a string) bool {
+	return a == "margin" || a == "float" || a == "off"
+}
+
 // opcoesBoard são as opções do verbo `board`. A Prancheta não tem escala nem
 // modo de Nota: ela é vetorial, o zoom é do navegador, e a Nota aparece na
 // inspeção em vez de num plano fixo do desenho.
@@ -96,7 +117,7 @@ type opcoesBoard struct {
 func interpretaBoard(args []string) (opcoesBoard, error) {
 	o := opcoesBoard{saida: "."}
 	var posicionais []string
-	args = expandeIguais(args)
+	args, _ = expandeIguais(args)
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if !ehOpcao(a) {
@@ -129,7 +150,8 @@ func interpretaBoard(args []string) (opcoesBoard, error) {
 // Documento.
 func interpretaArquivo(args []string) (string, error) {
 	var posicionais []string
-	for _, a := range expandeIguais(args) {
+	expandidos, _ := expandeIguais(args)
+	for _, a := range expandidos {
 		if ehOpcao(a) {
 			return "", fmt.Errorf("opção desconhecida %q", a)
 		}
@@ -155,16 +177,25 @@ func ehOpcao(a string) bool {
 
 // expandeIguais quebra `--opcao=valor` em dois argumentos, para que a leitura
 // aceite as duas formas.
-func expandeIguais(args []string) []string {
+//
+// O segundo resultado diz, para cada argumento da saída, se ele é o NOME de uma
+// opção que veio na forma `=`. É a única pista que resta da forma original, e
+// ela importa para as opções BOOLEANAS: `--notes=x` não tem valor a consumir,
+// mas o "x" também não é do comando — sem esta marca ele escorria para os
+// posicionais e o erro acusava o Documento.
+func expandeIguais(args []string) ([]string, []bool) {
 	saida := make([]string, 0, len(args))
+	colado := make([]bool, 0, len(args))
 	for _, a := range args {
 		if nome, valor, achou := strings.Cut(a, "="); achou && ehOpcao(a) {
 			saida = append(saida, nome, valor)
+			colado = append(colado, true, false)
 			continue
 		}
 		saida = append(saida, a)
+		colado = append(colado, false)
 	}
-	return saida
+	return saida, colado
 }
 
 // valorDe consome o argumento seguinte como valor da opção.
@@ -225,7 +256,7 @@ type opcoesSkill struct {
 func interpretaSkill(args []string) (opcoesSkill, error) {
 	var o opcoesSkill
 	sim, nao := false, false
-	args = expandeIguais(args)
+	args, _ = expandeIguais(args)
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
@@ -266,7 +297,8 @@ type opcoesUpdate struct {
 func interpretaUpdate(args []string) (opcoesUpdate, error) {
 	var o opcoesUpdate
 	sim, nao := false, false
-	for _, a := range expandeIguais(args) {
+	expandidos, _ := expandeIguais(args)
+	for _, a := range expandidos {
 		switch a {
 		case "--check", "-check":
 			o.conferir = true

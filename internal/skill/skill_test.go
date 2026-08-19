@@ -81,7 +81,7 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"nó slot no exemplo de Componente":    "  - slot: \"body\"",
 		"tabela da flag --out":                "| `--out DIR` | `render`, `board` | `.` | diretório de saída |",
 		"tabela da flag --scale":              "| `--scale N` | `render` | `1` | multiplicador float > 0 de toda a imagem |",
-		"tabela da flag --notes":              "| `--notes MODO` | `render` | `margin` | `margin` (Notas no Chrome), `float` (sobre o Frame), `off` (sem Notas) |",
+		"tabela da flag --notes":              "| `--notes` | `render` | desligado | desenha as Notas em balões sobre o Frame; sem ela a imagem sai sem Nota nenhuma |",
 		"tabela da flag --layers":             "| `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |",
 		"tabela da flag --install":            "| `--install [DIR]` | `skill` | `~/.claude/skills` | grava a skill em `<DIR>/draftboard/SKILL.md` |",
 		"tabela da flag --sync":               "| `--sync [DIR]` | `skill` | `~/.claude/skills` | regrava a skill só se o conteúdo mudou, perguntando antes |",
@@ -146,7 +146,7 @@ func TestSkillDocumentaAsRegrasDeElevacao(t *testing.T) {
 		"desempate do pai":           "- O pai de um Elemento é o **último Elemento já pintado** (em qualquer Camada ≤ `i`) cuja bounding box contém a do Elemento, com contenção inclusiva. Sem pai, `elevacaoDoPai = base[i]`.",
 		"fórmula da Elevação":        "- `Elevacao = max(elevacaoDoPai, base[i]) + 1` — pode subir mais de um degrau de uma vez quando o pai está numa Camada inferior.",
 		"bounding box declarada":     "- Elemento recortado pela borda do Frame entra na contenção com a bounding box **declarada**, não com a recortada.",
-		"Nota fora da Elevação":      "- `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); some inteira com `--notes off`.",
+		"Nota fora da Elevação":      "- `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); só aparece na imagem com `--notes`.",
 		"ausência de cor declarada":  "**Não existe declaração de cor.** O Tom (cinza de 100, quase branco, a 900, quase preto)",
 		"ordem de pintura declarada": "- Ordem de pintura: Camadas na ordem declarada, Elementos na ordem declarada dentro da Camada.",
 	}

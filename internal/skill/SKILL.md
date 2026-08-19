@@ -112,7 +112,7 @@ Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use`, `slot` 
 - `slots` só existe em `use`. `default` (lista de nós) só existe em `slot`.
 - `slot` só é válido dentro de Componente — nunca em Documento.
 - `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.
-- `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); some inteira com `--notes off`.
+- `note` é a Nota: texto anexado ao Elemento, fora do desenho. A Nota **não participa da Elevação e não aparece no export por Camada** (`--layers`); só aparece na imagem com `--notes`.
 - `to` é a Ligação: o nome do Frame para onde este Elemento leva. Só aparece na Prancheta (`board`) e na árvore do `inspect` — **não muda o desenho nem a Elevação**, e a imagem WebP sai igual com e sem ele.
 - `id` renomeia o segmento do Elemento no caminho da árvore.
 - Toda chave desconhecida, em qualquer nível, é erro com sugestão da chave próxima.
@@ -271,7 +271,7 @@ da conversão para px.
 é derivado automaticamente da Elevação, que é a distância do Elemento até o Frame contada
 em Superfícies empilhadas.
 
-- O Frame tem Elevação 0 e Tom 100. O Chrome usa 900, reservado.
+- O Frame tem Elevação 0 e Tom 100. O balão da Nota usa 900, reservado.
 - Ordem de pintura: Camadas na ordem declarada, Elementos na ordem declarada dentro da Camada.
 - Cada Camada `i` parte de um piso: `base[0] = 0` e `base[i] = max(base[i-1], maiorElevacaoNaCamada[i-1]) + 1`.
 - O pai de um Elemento é o **último Elemento já pintado** (em qualquer Camada ≤ `i`) cuja bounding box contém a do Elemento, com contenção inclusiva. Sem pai, `elevacaoDoPai = base[i]`.
@@ -285,7 +285,7 @@ Consequência prática: para dar contraste a um Elemento, **aninhe-o** dentro de
 ## CLI
 
 ```
-draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
+draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes] [--layers]
 draftboard board    <arquivo.yaml> [--out DIR]
 draftboard inspect  <arquivo.yaml>
 draftboard validate <arquivo.yaml>
@@ -298,7 +298,7 @@ draftboard update   [--check] [--yes] [--no]
 | --- | --- | --- | --- |
 | `--out DIR` | `render`, `board` | `.` | diretório de saída |
 | `--scale N` | `render` | `1` | multiplicador float > 0 de toda a imagem |
-| `--notes MODO` | `render` | `margin` | `margin` (Notas no Chrome), `float` (sobre o Frame), `off` (sem Notas) |
+| `--notes` | `render` | desligado | desenha as Notas em balões sobre o Frame; sem ela a imagem sai sem Nota nenhuma |
 | `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |
 | `--install [DIR]` | `skill` | `~/.claude/skills` | grava a skill em `<DIR>/draftboard/SKILL.md` |
 | `--sync [DIR]` | `skill` | `~/.claude/skills` | regrava a skill só se o conteúdo mudou, perguntando antes |

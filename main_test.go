@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"image"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/eduardotorresdev/draftboard/internal/notes"
 	"github.com/eduardotorresdev/draftboard/internal/render"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
 	"github.com/eduardotorresdev/draftboard/internal/skill"
@@ -317,12 +318,80 @@ func TestRenderUsaOsPadroesDaLinhaDeComando(t *testing.T) {
 	if o.escala != 1 {
 		t.Errorf("--scale padrão = %v, queria 1", o.escala)
 	}
-	if o.notas != notes.Margem {
-		t.Errorf("--notes padrão = %v, queria notes.Margem", o.notas)
+	if o.notas {
+		t.Error("--notes padrão ligado, queria desligado: a imagem sai sem Nota até que se peça")
 	}
 	if o.camadas {
 		t.Error("--layers padrão ligado, queria desligado")
 	}
+}
+
+// TestNotaSoApareceQuandoPedida prova as duas pontas da flag booleana pela
+// imagem, que é o único observável de "desenhou Nota": o balão usa o Tom
+// reservado, que nenhum Elemento pode alcançar, então contar pixels dele
+// responde à pergunta sem conhecer o layout da anotação.
+func TestNotaSoApareceQuandoPedida(t *testing.T) {
+	pasta := numaPastaTemporariaDe(t, "f4", "notas.yaml")
+	const imagem = "notas-home.webp"
+
+	codigo, _, erros := executa("render", "notas.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	semNota := decodificaWebP(t, filepath.Join(pasta, imagem))
+	if semNota.Bounds().Dx() != 200 || semNota.Bounds().Dy() != 120 {
+		t.Errorf("tela sem Notas = %v, queria as dimensões do Frame, 200x120", semNota.Bounds())
+	}
+	if n := pixelsDoBalao(semNota); n != 0 {
+		t.Errorf("%d pixels de balão sem --notes: a Nota deixou de ser opt-in", n)
+	}
+
+	codigo, _, erros = executa("render", "notas.yaml", "--notes")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	comNota := decodificaWebP(t, filepath.Join(pasta, imagem))
+	if comNota.Bounds() != semNota.Bounds() {
+		t.Errorf("tela com --notes = %v, queria a mesma de sem Notas, %v", comNota.Bounds(), semNota.Bounds())
+	}
+	if pixelsDoBalao(comNota) == 0 {
+		t.Error("--notes não desenhou balão nenhum")
+	}
+}
+
+// TestNotesNaoConsomeOCaminhoDoDocumento fecha a armadilha da flag booleana: o
+// argumento seguinte a `--notes` só é consumido quando é um dos três modos
+// aposentados, então o Documento pode vir logo depois dela.
+func TestNotesNaoConsomeOCaminhoDoDocumento(t *testing.T) {
+	pasta := numaPastaTemporariaDe(t, "f4", "notas.yaml")
+
+	codigo, saida, erros := executa("render", "--notes", "notas.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	if !strings.Contains(saida, "notas-home.webp") {
+		t.Errorf("stdout = %q, queria o caminho da imagem", saida)
+	}
+	if n := pixelsDoBalao(decodificaWebP(t, filepath.Join(pasta, "notas-home.webp"))); n == 0 {
+		t.Error("o Documento foi consumido como valor de --notes: nenhum balão desenhado")
+	}
+}
+
+// pixelsDoBalao conta os pixels no Tom reservado ao plano de anotação. A escada
+// de Elevação nunca o alcança, então todo pixel assim é balão de Nota.
+func pixelsDoBalao(img image.Image) int {
+	reservado := scene.TomChrome.Cinza()
+	n := 0
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, _, _, _ := img.At(x, y).RGBA()
+			if uint8(r>>8) == reservado {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 func TestRenderRejeitaOpcaoInvalida(t *testing.T) {
@@ -336,7 +405,16 @@ func TestRenderRejeitaOpcaoInvalida(t *testing.T) {
 		{"diretório de saída vazio", []string{"render", "dois-frames.yaml", "--out="}, `erro: opção "--out" espera um diretório, encontrou valor vazio`},
 		{"escala zero", []string{"render", "dois-frames.yaml", "--scale", "0"}, `erro: opção "--scale" espera um número maior que zero, encontrou "0"`},
 		{"escala não numérica", []string{"render", "dois-frames.yaml", "--scale", "grande"}, `erro: opção "--scale" espera um número maior que zero, encontrou "grande"`},
-		{"modo de Nota inexistente", []string{"render", "dois-frames.yaml", "--notes", "verde"}, `erro: opção "--notes" espera margin, float ou off, encontrou "verde"`},
+		{"modo de Nota aposentado, solto", []string{"render", "dois-frames.yaml", "--notes", "off"}, `erro: opção "--notes" não aceita mais valor: os modos margin, float e off acabaram; use "--notes" sozinho para os balões flutuantes, ou omita a opção para renderizar sem Notas`},
+		{"modo de Nota aposentado, com igual", []string{"render", "dois-frames.yaml", "--notes=margin"}, `erro: opção "--notes" não aceita mais valor: os modos margin, float e off acabaram; use "--notes" sozinho para os balões flutuantes, ou omita a opção para renderizar sem Notas`},
+		// `--notes` é booleana, então a forma `=` não tem valor a
+		// consumir — mas o valor também não é do comando. Sem uma recusa
+		// própria ele escorria para os posicionais, e a mensagem
+		// acusava o Documento, ou saía sem arquivo nem motivo.
+		{"--notes com valor vazio", []string{"render", "dois-frames.yaml", "--notes="}, `erro: opção "--notes" não aceita valor, encontrou ""`},
+		{"--notes com valor booleano", []string{"render", "dois-frames.yaml", "--notes=true"}, `erro: opção "--notes" não aceita valor, encontrou "true"`},
+		{"--notes com valor antes do Documento", []string{"render", "--notes=true", "dois-frames.yaml"}, `erro: opção "--notes" não aceita valor, encontrou "true"`},
+		{"--notes com valor vazio e sem Documento", []string{"render", "--notes="}, `erro: opção "--notes" não aceita valor, encontrou ""`},
 		{"opção desconhecida", []string{"render", "dois-frames.yaml", "--turbo"}, `erro: opção desconhecida "--turbo"`},
 		{"sem Documento", []string{"render"}, "erro: informe o caminho do Documento"},
 	}
@@ -394,6 +472,43 @@ func TestRenderRecusaTelaAcimaDoLimiteDeArea(t *testing.T) {
 			}
 			conferaGoldenEm(t, goldens, c.golden, stderr)
 		})
+	}
+}
+
+// TestTetoDeAreaRecusaAntesDePlanejarAsNotas: a recusa pelo teto de área vem
+// antes de qualquer alocação, e `--notes` não é exceção.
+//
+// A ordem antiga planejava a anotação primeiro, porque as margens do plano
+// entravam na conta do teto. Elas não entram mais — o balão é preso dentro do
+// Frame e Margens() é sempre 0 —, e planejar antes só custava: a régua do plano
+// é um Canvas na escala pedida, e `--scale 9000` a fazia alocar centenas de
+// megabytes para chegar exatamente ao mesmo erro.
+//
+// A medida é de bytes alocados no processo, não de residente: TotalAlloc é
+// cumulativo e não depende do coletor ter passado.
+func TestTetoDeAreaRecusaAntesDePlanejarAsNotas(t *testing.T) {
+	// Folga generosa sobre o custo real da recusa, que é de kilobytes, e
+	// duas ordens de grandeza abaixo dos ~280 MB da ordem antiga.
+	const teto = 32 << 20
+
+	numaPastaTemporariaDe(t, "f4", "notas.yaml")
+
+	var antes, depois runtime.MemStats
+	runtime.ReadMemStats(&antes)
+	codigo, stdout, stderr := executa("render", "notas.yaml", "--notes", "--scale", "9000")
+	runtime.ReadMemStats(&depois)
+
+	if codigo != 1 {
+		t.Fatalf("código de saída = %d, queria 1; stderr: %s", codigo, stderr)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, queria vazio", stdout)
+	}
+	if !strings.Contains(stderr, "acima do limite de") {
+		t.Errorf("stderr = %q, queria o erro de teto de área", stderr)
+	}
+	if gasto := depois.TotalAlloc - antes.TotalAlloc; gasto > teto {
+		t.Errorf("a recusa alocou %d bytes, acima de %d: o plano de anotação foi calculado antes do teto de área", gasto, teto)
 	}
 }
 

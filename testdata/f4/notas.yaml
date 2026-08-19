@@ -1,0 +1,10 @@
+frames:
+  - name: home
+    w: 200
+    h: 120
+    layers:
+      - name: conteudo
+        elements:
+          - rect: {x: 10, y: 20, w: 30, h: 30}
+            id: cartao
+            note: "Cartão"

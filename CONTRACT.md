@@ -356,38 +356,50 @@ layout continua coerente consigo mesmo.
 ```go
 package notes
 
-type Modo int
-const (Margem Modo = iota; Flutuante; Desligado) // Margem é o padrão da CLI
+// LimiteDaNota é o teto de tamanho de uma Nota, em RUNAS. O layout não o
+// consulta: mede sempre o texto inteiro. Quem o transforma em Erro é o
+// diagnóstico.
+const LimiteDaNota = 200
 
 // Plano calcula o layout das Notas de um Frame sem desenhar.
 type Plano struct{ /* ... */ }
 
 // Planeja resolve a posição de todas as Notas do Frame. escala é o fator da CLI.
-func Planeja(f scene.Frame, m Modo, escala float64) *Plano
+// Quem não quer Notas não chama Planeja: passa um *Plano nulo adiante.
+func Planeja(f scene.Frame, escala float64) *Plano
 
-// Margens devolve o Chrome necessário em px do espaço do Frame. No modo
-// Flutuante e Desligado devolve 0,0,0,0.
+// Margens devolve as margens da tela em px do espaço do Frame. São sempre
+// 0,0,0,0: o balão é preso dentro do Frame e a tela tem as dimensões dele.
 func (p *Plano) Margens() (t, d, b, e float64)
 
 // Desenha pinta Notas e linhas de chamada sobre um Canvas já criado com essas
-// margens. No modo Desligado não faz nada.
+// margens. Um *Plano nulo não desenha nada.
 func (p *Plano) Desenha(c *render.Canvas)
 ```
 
 Notas não participam da Elevação e **não aparecem no export por Camada**.
 
+A Nota é desenhada num balão ao lado do Elemento que a carrega, preso dentro do
+Frame. **Dois balões nunca se cruzam**: quem cede é o que chega depois na ordem
+de colheita, que é função só da geometria e do texto — a ordem de declaração
+não muda o layout.
+
 ## 7. CLI (congelada, dono F1; F5 acrescenta só `skill`)
 
 ```
-draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
+draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes] [--layers]
 draftboard board    <arquivo.yaml> [--out DIR]
 draftboard inspect  <arquivo.yaml>
 draftboard validate <arquivo.yaml>
 draftboard skill    [--install [DIR]]
 ```
 
-- `--out` padrão `.`; `--scale` padrão `1` (float > 0); `--notes` padrão `margin`;
-  `--layers` liga o export por Camada, cumulativo (cada imagem tem a Camada e todas abaixo).
+- `--out` padrão `.`; `--scale` padrão `1` (float > 0); `--notes` é booleana e o padrão é
+  **sem Notas**; `--layers` liga o export por Camada, cumulativo (cada imagem tem a Camada e
+  todas abaixo).
+- `--notes` espia o argumento seguinte: se ele for exatamente `margin`, `float` ou `off`,
+  consome-o e sai com **código 1** e a mensagem de migração dos modos aposentados. Qualquer
+  outra coisa não é consumida — `render --notes doc.yaml` funciona.
 - `render` imprime no **stdout apenas os caminhos escritos**, um por linha, na ordem de geração.
 - `inspect` imprime a árvore no stdout e não toca em disco.
 - `validate` não imprime nada no stdout em caso de sucesso.
