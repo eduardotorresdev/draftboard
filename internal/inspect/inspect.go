@@ -28,8 +28,12 @@ func Arvore(w io.Writer, d *scene.Documento) error {
 					continue
 				}
 				fmt.Fprintf(b, "      %s\n", linhaDoElemento(e))
+				// A Nota sai entre aspas pela mesma razão que o Rótulo: é
+				// texto livre do autor, e crua ela forja a árvore — uma Nota
+				// com quebra de linha seguida de seis espaços produz uma linha
+				// indistinguível de um Elemento real para quem lê a árvore.
 				if e.Nota != "" {
-					fmt.Fprintf(b, "        nota: %s\n", e.Nota)
+					fmt.Fprintf(b, "        nota: %q\n", e.Nota)
 				}
 			}
 		}

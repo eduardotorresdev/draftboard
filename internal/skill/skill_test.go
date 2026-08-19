@@ -115,6 +115,9 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"posição derivada do Rótulo":          "**A posição é derivada, não declarada.** Retângulo que contém geometricamente outro",
 		"altura da caixa do Rótulo":           "- A caixa do Rótulo tem **28 px de altura** no espaço do Frame, saturando na altura do",
 		"regra da fonte derivada":             "- O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de",
+		"posição do sufixo rotulo=":           "de Componente. `para=` só aparece para Elementos que declaram Ligação. `rotulo=` fecha a",
+		"Nota entre aspas na árvore":          "        nota: \"<texto>\"",
+		"teto do label do Retângulo":          "- O texto do Rótulo tem teto de **200 runas**: acima disso a decodificação recusa o",
 	}
 	for fato, linha := range linhas {
 		if !contemLinha(c, linha) {

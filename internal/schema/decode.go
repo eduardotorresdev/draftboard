@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 
@@ -40,6 +41,13 @@ var (
 	// Controle: o Retângulo também o aceita, e tem regra e mensagem próprias.
 	chavesSoDeControle = []string{"items", "active", "value"}
 )
+
+// LimiteDoRotulo é o teto, em runas, do texto declarado em `label` num `rect`.
+//
+// É o mesmo número do teto da Nota, contado do mesmo jeito e pela mesma razão:
+// são as duas entradas de texto livre do autor, e o limite tem que ser sabido
+// enquanto se escreve. Um Rótulo é nome de bloco — 200 runas já é folgado.
+const LimiteDoRotulo = 200
 
 // LeDocumento lê e decodifica o arquivo YAML no caminho dado como Documento. O
 // tipo do arquivo é inferido pelo conteúdo: declarar `frames` faz dele um
@@ -395,6 +403,16 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 		if no.Tipo == TipoRetangulo {
 			if no.Rotulo, err = l.texto(m, "label"); err != nil {
 				return No{}, err
+			}
+			// O teto é conferido aqui, e recusa, porque o texto do Rótulo era
+			// a única entrada do módulo sem limite: o rasterizador desenha
+			// glifo a glifo mesmo quando a máscara descarta tudo, e um `label`
+			// de 200 000 runas dentro de uma Repetição custa horas de CPU para
+			// produzir uma imagem onde nada aparece. Nomear um bloco não é
+			// problema que a máquina conserte sozinha, então é erro do autor.
+			if n := utf8.RuneCountInString(no.Rotulo); n > LimiteDoRotulo {
+				return No{}, l.erro(local,
+					`campo "label" passou do teto de %d runas: encontrou %d`, LimiteDoRotulo, n)
 			}
 		}
 	}

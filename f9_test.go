@@ -438,3 +438,55 @@ func TestCaminhoDoRotuloUsaOCaminhoDesambiguadoDoDono(t *testing.T) {
 			segundo.Y, dono.Caminho, dono.Y, dono.Y+dono.A)
 	}
 }
+
+// TestLabelTemTetoDeComprimento fecha a última entrada de texto do módulo sem
+// limite. O rasterizador desenha glifo a glifo mesmo quando a máscara descarta
+// tudo: um `label` de 200 000 runas dentro de uma Repetição custa horas de CPU
+// para produzir uma imagem onde nada aparece.
+func TestLabelTemTetoDeComprimento(t *testing.T) {
+	t.Run("no teto passa", func(t *testing.T) {
+		naPastaDeRotulos(t)
+
+		if codigo, _, erros := executa("validate", "label-no-limite.yaml"); codigo != 0 {
+			t.Fatalf("código de saída = %d, queria 0: 200 runas cabem; stderr: %s", codigo, erros)
+		}
+	})
+
+	t.Run("uma runa acima recusa", func(t *testing.T) {
+		naPastaDeRotulos(t)
+
+		codigo, saida, erros := executa("validate", "label-longo.yaml")
+		if codigo != 1 {
+			t.Fatalf("código de saída = %d, queria 1", codigo)
+		}
+		if saida != "" {
+			t.Errorf("stdout = %q, queria vazio", saida)
+		}
+		esperado := "erro: label-longo.yaml: frames[0].layers[0].elements[0]: " +
+			`campo "label" passou do teto de 200 runas: encontrou 201` + "\n"
+		if erros != esperado {
+			t.Errorf("stderr = %q, quer %q", erros, esperado)
+		}
+	})
+}
+
+// TestNotaSaiEntreAspasNaArvore fecha a assimetria com o Rótulo. Uma Nota com
+// quebra de linha seguida de seis espaços produz, na árvore, uma linha
+// indistinguível de um Elemento real para o agente que a lê.
+func TestNotaSaiEntreAspasNaArvore(t *testing.T) {
+	naPastaDeRotulos(t)
+
+	codigo, saida, erros := executa("inspect", "nota-forjada.yaml")
+	if codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	esperado := `        nota: "primeira linha\n      fantasma retangulo 0,0 100x100 tom=100 elev=9"`
+	if !strings.Contains(saida, esperado) {
+		t.Errorf("a Nota não saiu entre aspas; queria a linha:\n%s\nsaída:\n%s", esperado, saida)
+	}
+	for _, linha := range strings.Split(saida, "\n") {
+		if strings.HasPrefix(linha, "      fantasma ") {
+			t.Errorf("a Nota forjou uma linha de Elemento na árvore: %q", linha)
+		}
+	}
+}

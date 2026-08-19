@@ -187,6 +187,8 @@ sozinho. Não existe chave para forçar nem para desligar.
   wireframe vai estourar o componente na UI.
 - O tamanho da fonte é derivado da altura da caixa, como no Controle — sem campo de
   fonte, de alinhamento nem de cor.
+- O texto do Rótulo tem teto de **200 runas**: acima disso a decodificação recusa o
+  Documento. É o mesmo teto da Nota, e pela mesma razão — Rótulo é nome de bloco.
 - No `inspect`, o Rótulo aparece como sufixo `rotulo="..."` na linha do próprio
   Retângulo; o texto não vira uma linha a mais na árvore.
 
@@ -337,15 +339,17 @@ documento <nome>
   frame <nome> <L>x<A>
     camada <nome>
       <caminho> <retangulo|circulo|texto> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>][ rotulo="<texto>"]
-        nota: <texto>
+        nota: "<texto>"
 ```
 
 `<caminho>`: segmentos separados por `/`. O segmento de um Elemento é `e<indice>` na sua
 lista, ou o `id` declarado quando houver. Uma Instância acrescenta um segmento por nível
 de Componente; um Slot acrescenta o segmento com o nome do Slot.
 Exemplos: `e0`, `header`, `e3/e1`, `e3/body/e0`. `de=` só aparece para Elementos vindos
-de Componente. `para=` só aparece para Elementos que declaram Ligação. `rotulo=` só
-aparece para Retângulos com `label`, e vai sempre por último na linha.
+de Componente. `para=` só aparece para Elementos que declaram Ligação. `rotulo=` fecha a
+linha de um Retângulo com `label`; num Controle ele é um dos parâmetros e vem logo depois
+de `controle=`, antes de `para=`. A Nota e o Rótulo saem entre aspas, com escapes: são as
+duas entradas de texto livre do autor, e cruas forjariam linhas na árvore.
 
 ## Erros × avisos
 

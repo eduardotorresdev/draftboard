@@ -1,0 +1,10 @@
+frames:
+  - name: t
+    w: 100
+    h: 100
+    layers:
+      - name: c
+        elements:
+          - rect: {x: 10, y: 10, w: 20, h: 20}
+            id: real
+            note: "primeira linha\n      fantasma retangulo 0,0 100x100 tom=100 elev=9"
