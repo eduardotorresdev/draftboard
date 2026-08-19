@@ -412,3 +412,111 @@ func comoErroDoDominio(err error, alvo **scene.Erro) bool {
 func mais() float64      { return 1 / zero() }
 func naoNumero() float64 { return zero() / zero() }
 func zero() float64      { return 0 }
+
+// TestChaveRepetidaTrocaAQueODesenhoUsa casa a cirurgia com a decodificação.
+//
+// O schema monta o mapa iterando os pares, então um nó com dois `w` desenha com
+// o ÚLTIMO. Trocando o primeiro, a largura desenhada não mudaria: o Aviso
+// continuaria saindo e toda execução seguinte reescreveria o arquivo imprimindo
+// `w 40 → 40`, sem nunca convergir.
+func TestChaveRepetidaTrocaAQueODesenhoUsa(t *testing.T) {
+	corpo := "        elements:\n          - rect: {x: 0, y: 0, w: 20, h: 10, w: 21}\n"
+	caminho := escreve(t, "doc.yaml", cabecalho+corpo)
+	a, err := Abre(caminho)
+	if err != nil {
+		t.Fatalf("abrindo: %v", err)
+	}
+	if ok, razao := a.Alargavel(localDoPrimeiro); !ok {
+		t.Fatalf("Alargavel = false, %q; queria true", razao)
+	}
+	if err := a.Alarga(localDoPrimeiro, 47); err != nil {
+		t.Fatalf("alargando: %v", err)
+	}
+	trocas, err := a.Grava()
+	if err != nil {
+		t.Fatalf("gravando: %v", err)
+	}
+	// `De` é o valor DECODIFICADO: 21, e não os 20 da primeira ocorrência.
+	if len(trocas) != 1 || trocas[0].De != 21 {
+		t.Errorf("trocas = %+v, queria uma de 21", trocas)
+	}
+	quer := cabecalho + "        elements:\n          - rect: {x: 0, y: 0, w: 20, h: 10, w: 47}\n"
+	if got := le(t, caminho); got != quer {
+		t.Errorf("arquivo gravado:\n%s\nqueria:\n%s", got, quer)
+	}
+}
+
+// TestGravaPreservaOModoDoDocumento: o temporário nasce 0600, e um Documento de
+// grupo que virasse 0600 por ter sido corrigido tiraria o acesso de quem
+// compartilha o repositório com o autor.
+func TestGravaPreservaOModoDoDocumento(t *testing.T) {
+	corpo := "        elements:\n          - rect: {x: 0, y: 0, w: 20, h: 10}\n"
+	caminho := escreve(t, "doc.yaml", cabecalho+corpo)
+	// 0640 é distinto do 0600 do temporário e do 0644 que a fixture nasce:
+	// com 0600 o caso não distinguiria preservar de não preservar.
+	const modo os.FileMode = 0o640
+	if err := os.Chmod(caminho, modo); err != nil {
+		t.Fatalf("marcando o modo: %v", err)
+	}
+
+	a, err := Abre(caminho)
+	if err != nil {
+		t.Fatalf("abrindo: %v", err)
+	}
+	if err := a.Alarga(localDoPrimeiro, 47); err != nil {
+		t.Fatalf("alargando: %v", err)
+	}
+	if _, err := a.Grava(); err != nil {
+		t.Fatalf("gravando: %v", err)
+	}
+
+	info, err := os.Stat(caminho)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if got := info.Mode().Perm(); got != modo {
+		t.Errorf("modo depois do conserto = %04o, queria %04o", got, modo)
+	}
+	if !strings.Contains(le(t, caminho), "w: 47") {
+		t.Error("o conserto não chegou ao arquivo: o caso não prova nada sobre o modo")
+	}
+}
+
+// TestAbreAmostraOMtimeAntesDaLeitura fecha a janela em que a guarda de mtime
+// não guarda nada: amostrado só DEPOIS da leitura, o mtime seria o da edição do
+// autor, Grava aprovaria, e o buffer velho voltaria por cima — a edição
+// desapareceria em silêncio.
+func TestAbreAmostraOMtimeAntesDaLeitura(t *testing.T) {
+	corpo := "        elements:\n          - rect: {x: 0, y: 0, w: 20, h: 10}\n"
+	caminho := escreve(t, "doc.yaml", cabecalho+corpo)
+	doAutor := cabecalho + "        elements:\n          - rect: {x: 0, y: 0, w: 20, h: 10}\n          - circle: {x: 0, y: 50, d: 10}\n"
+
+	// O autor salva EXATAMENTE entre a leitura e o segundo stat.
+	original := leArquivo
+	leArquivo = func(nome string) ([]byte, error) {
+		dados, err := original(nome)
+		if err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(nome, []byte(doAutor), 0o644); err != nil {
+			t.Fatalf("simulando o salvamento do autor: %v", err)
+		}
+		return dados, nil
+	}
+	t.Cleanup(func() { leArquivo = original })
+
+	a, err := Abre(caminho)
+	if err == nil {
+		// Segue até o fim para mostrar o estrago que a guarda evita.
+		if erroDeAlargar := a.Alarga(localDoPrimeiro, 47); erroDeAlargar == nil {
+			a.Grava()
+		}
+		t.Fatalf("Abre aceitou o arquivo que mudou durante a leitura; Documento agora:\n%s", le(t, caminho))
+	}
+	if !strings.Contains(err.Error(), "o arquivo mudou no disco desde a leitura") {
+		t.Errorf("erro = %v, queria a recusa por mudança no disco", err)
+	}
+	if got := le(t, caminho); got != doAutor {
+		t.Errorf("a edição do autor foi revertida:\n%s", got)
+	}
+}

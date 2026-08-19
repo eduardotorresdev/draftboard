@@ -73,16 +73,36 @@ type troca struct {
 	valor *yaml.Node
 }
 
+// leArquivo é a leitura do Documento, isolada num ponto de costura. A guarda de
+// mtime só se prova com o arquivo mudando ENTRE a leitura e o segundo stat, e
+// não há como provocar essa janela de fora sem depender de tempo de relógio.
+var leArquivo = os.ReadFile
+
 // Abre lê o arquivo YAML cru e indexa os nós endereçáveis.
+//
+// O tamanho e o mtime são amostrados ANTES da leitura e conferidos depois. É a
+// guarda que Grava usa para saber se o Documento mudou no disco, e amostrá-la
+// só depois de ler a inutilizaria: o editor do autor que salvasse entre a
+// leitura e o stat faria Grava comparar com o mtime pós-edição, aprovar, e
+// gravar o buffer velho por cima — a edição do autor desapareceria em silêncio.
 func Abre(arquivo string) (*Arquivo, error) {
-	dados, err := os.ReadFile(arquivo)
+	antes, err := os.Stat(arquivo)
 	if err != nil {
 		return nil, erroDeArquivo(arquivo, err, "não foi possível ler o Documento")
 	}
-	info, err := os.Stat(arquivo)
+	dados, err := leArquivo(arquivo)
 	if err != nil {
 		return nil, erroDeArquivo(arquivo, err, "não foi possível ler o Documento")
 	}
+	depois, err := os.Stat(arquivo)
+	if err != nil {
+		return nil, erroDeArquivo(arquivo, err, "não foi possível ler o Documento")
+	}
+	if depois.Size() != antes.Size() || !depois.ModTime().Equal(antes.ModTime()) {
+		return nil, &scene.Erro{Arquivo: arquivo,
+			Msg: "o arquivo mudou no disco desde a leitura; rode o comando de novo"}
+	}
+	info := antes
 	var doc yaml.Node
 	if err := yaml.Unmarshal(dados, &doc); err != nil {
 		return nil, &scene.Erro{Arquivo: arquivo, Msg: "YAML inválido: " + err.Error()}
@@ -240,6 +260,14 @@ func escreveNoLugar(alvo string, dados []byte, modo fs.FileMode) error {
 	nome := tmp.Name()
 	defer os.Remove(nome)
 	if _, err := tmp.Write(dados); err != nil {
+		tmp.Close()
+		return erroDeArquivo(alvo, err, "não foi possível gravar o Documento")
+	}
+	// O conteúdo é sincronizado ANTES do rename: o rename é atômico para o
+	// processo, não para a máquina. Sem isto, uma queda de energia logo depois
+	// de o comando devolver 0 deixaria o Documento do autor com zero byte —
+	// exatamente o que a escrita em temporário existe para evitar.
+	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		return erroDeArquivo(alvo, err, "não foi possível gravar o Documento")
 	}
@@ -401,16 +429,23 @@ func slotDeNomeMaisLongo(mapa *yaml.Node, resto string) (*yaml.Node, string, boo
 }
 
 // filho devolve o valor de uma chave de um nó de mapa.
+//
+// Varre até o FIM e devolve a ÚLTIMA ocorrência, porque é essa a semântica da
+// decodificação: schema monta um mapa iterando os pares, e a chave repetida
+// sobrescreve a anterior. Devolvendo a primeira, a cirurgia trocaria um `w` que
+// o desenho ignora — o Aviso continuaria saindo, e toda execução seguinte
+// reescreveria o arquivo imprimindo `w 40 → 40`, sem nunca convergir.
 func filho(no *yaml.Node, chave string) (*yaml.Node, bool) {
 	if no == nil || no.Kind != yaml.MappingNode {
 		return nil, false
 	}
+	var valor *yaml.Node
 	for i := 0; i+1 < len(no.Content); i += 2 {
 		if no.Content[i].Value == chave {
-			return no.Content[i+1], true
+			valor = no.Content[i+1]
 		}
 	}
-	return nil, false
+	return valor, valor != nil
 }
 
 // escalarSimples reporta se o nó é um número escrito solto no arquivo — o único
