@@ -198,29 +198,83 @@ func TestCaminhoDoRotuloTemSegmentoProprio(t *testing.T) {
 // TestRotuloSeApoiaNoRetanguloQueOCarrega é a razão de o Rótulo ser emitido
 // imediatamente depois do seu Retângulo, e não no fim da Camada: a Superfície
 // dele tem de ser o bloco que o carrega, é de lá que vêm a Elevação e o Tom que
-// dão contraste ao texto. Empilhado no fim, um filho qualquer viraria a
-// Superfície e o texto sumiria dentro dele.
+// dão contraste ao texto.
+//
+// A fixture é a barra de cabeçalho, e é ela que dá mordida ao teste: o
+// `cabecalho` cobre exatamente a faixa onde o Rótulo se apoia. Fosse a Elevação
+// calculada depois de o Rótulo subir para o fim da Camada, a Superfície dele
+// seria o `cabecalho`, e o texto ganharia um degrau a mais e sumiria dentro
+// dele.
 func TestRotuloSeApoiaNoRetanguloQueOCarrega(t *testing.T) {
-	doc := resolveDeF9(t, "rotulos.yaml")
+	doc := resolveDeF9(t, "cabecalho.yaml")
 
-	retangulo := porCaminho(t, doc, "regiao")
-	filho := porCaminho(t, doc, "filho")
+	regiao := porCaminho(t, doc, "regiao")
+	cabecalho := porCaminho(t, doc, "cabecalho")
 	rotulo := porCaminho(t, doc, "regiao/rotulo")
 
-	if rotulo.Elevacao != retangulo.Elevacao+1 {
-		t.Errorf("Elevação do Rótulo = %d, quer %d (um degrau sobre o Retângulo %d)",
-			rotulo.Elevacao, retangulo.Elevacao+1, retangulo.Elevacao)
+	if rotulo.Y != regiao.Y || rotulo.Y+rotulo.A > cabecalho.Y+cabecalho.A {
+		t.Fatalf("a fixture mudou: o Rótulo em %v..%v não está dentro da barra %v..%v",
+			rotulo.Y, rotulo.Y+rotulo.A, cabecalho.Y, cabecalho.Y+cabecalho.A)
 	}
-	if rotulo.Elevacao != filho.Elevacao {
-		t.Errorf("Elevação do Rótulo = %d e do filho pintado depois = %d: os dois se apoiam no mesmo Retângulo",
-			rotulo.Elevacao, filho.Elevacao)
+	if rotulo.Elevacao != regiao.Elevacao+1 {
+		t.Errorf("Elevação do Rótulo = %d, quer %d (um degrau sobre o Retângulo que o carrega)",
+			rotulo.Elevacao, regiao.Elevacao+1)
 	}
-	if rotulo.Tom != filho.Tom {
-		t.Errorf("Tom do Rótulo = %d, quer %d", int(rotulo.Tom), int(filho.Tom))
+	if rotulo.Elevacao == cabecalho.Elevacao+1 {
+		t.Errorf("Elevação do Rótulo = %d: ele se apoiou na barra que o cobre, não no Retângulo dono",
+			rotulo.Elevacao)
 	}
-	if rotulo.Tom == retangulo.Tom {
+	if rotulo.Tom != cabecalho.Tom {
+		t.Errorf("Tom do Rótulo = %d, quer %d: os dois se apoiam no mesmo Retângulo",
+			int(rotulo.Tom), int(cabecalho.Tom))
+	}
+	if rotulo.Tom == regiao.Tom {
 		t.Errorf("Tom do Rótulo = %d, igual ao do Retângulo: o texto não teria contraste", int(rotulo.Tom))
 	}
+}
+
+// TestRotuloEPintadoDepoisDosFilhos protege a segunda passagem. Emitido junto do
+// dono, o Rótulo é pintado antes dos filhos, e a barra de cabeçalho mais trivial
+// que existe o apaga da imagem em silêncio: o `inspect` continua dizendo
+// `rotulo="Resultados"`, a geometria e o Tom saem certos, e o WebP sai sem texto
+// nenhum.
+func TestRotuloEPintadoDepoisDosFilhos(t *testing.T) {
+	doc := resolveDeF9(t, "cabecalho.yaml")
+
+	camada := doc.Frames[0].Camadas[0]
+	ultimo := camada.Elementos[len(camada.Elementos)-1]
+	if ultimo.Caminho != "regiao/rotulo" {
+		t.Errorf("o último Elemento pintado da Camada é %q, quer %q: o Rótulo tem de ir por cima dos filhos",
+			ultimo.Caminho, "regiao/rotulo")
+	}
+	if indiceNaCamada(t, camada, "regiao/rotulo") < indiceNaCamada(t, camada, "cabecalho") {
+		t.Error("o Rótulo é pintado antes da barra que cobre a faixa dele: sumiria da imagem")
+	}
+}
+
+// TestRotuloDeControleNaoSobeParaOFimDaCamada delimita a segunda passagem: ela
+// é do Rótulo de Retângulo, e as peças de um Controle mantêm a ordem que o
+// catálogo montou. Subir o Rótulo do Controle o tiraria de cima da sua própria
+// peça de destaque.
+func TestRotuloDeControleNaoSobeParaOFimDaCamada(t *testing.T) {
+	doc := resolveDeF9(t, "tudo.yaml")
+
+	camada := doc.Frames[0].Camadas[0]
+	if indiceNaCamada(t, camada, "e2/item#0") > indiceNaCamada(t, camada, "e2/item#0/ativo") {
+		t.Error("o Rótulo do Controle mudou de lugar na Camada: a ordem das peças é do catálogo")
+	}
+}
+
+// indiceNaCamada devolve a posição de um Elemento na ordem de pintura da Camada.
+func indiceNaCamada(t *testing.T, c scene.Camada, caminho string) int {
+	t.Helper()
+	for i, e := range c.Elementos {
+		if e.Caminho == caminho {
+			return i
+		}
+	}
+	t.Fatalf("nenhum Elemento de caminho %q na Camada %q", caminho, c.Nome)
+	return -1
 }
 
 // TestRotuloPagaOTetoDeElementos protege o orçamento do Frame: sem o débito,
@@ -361,4 +415,26 @@ func TestPranchetaRecortaORotuloNaAreaDele(t *testing.T) {
 // coordenada formata um valor como a Prancheta o escreve no SVG.
 func coordenada(v float64) string {
 	return strconv.FormatFloat(v, 'f', -1, 64)
+}
+
+// TestCaminhoDoRotuloUsaOCaminhoDesambiguadoDoDono protege o pareamento
+// Rótulo↔dono por prefixo, de que vivem o painel da Prancheta e o diagnóstico.
+// Montado sobre o caminho bruto, o Rótulo do segundo bloco ficaria pendurado no
+// caminho do primeiro, e o texto seria atribuído ao Retângulo errado.
+func TestCaminhoDoRotuloUsaOCaminhoDesambiguadoDoDono(t *testing.T) {
+	doc := resolveDeF9(t, "ids-repetidos.yaml")
+
+	primeiro := porCaminho(t, doc, "bloco/rotulo")
+	if primeiro.Rotulo != "Primeiro" {
+		t.Errorf("Rótulo de %q = %q, quer %q", "bloco/rotulo", primeiro.Rotulo, "Primeiro")
+	}
+	segundo := porCaminho(t, doc, "bloco~2/rotulo")
+	if segundo.Rotulo != "Segundo" {
+		t.Errorf("Rótulo de %q = %q, quer %q", "bloco~2/rotulo", segundo.Rotulo, "Segundo")
+	}
+	dono := porCaminho(t, doc, "bloco~2")
+	if segundo.Y < dono.Y || segundo.Y > dono.Y+dono.A {
+		t.Errorf("o Rótulo em Y=%v não está dentro do Retângulo %q (%v..%v): ele pendurou no bloco errado",
+			segundo.Y, dono.Caminho, dono.Y, dono.Y+dono.A)
+	}
 }

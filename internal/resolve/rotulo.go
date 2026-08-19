@@ -42,6 +42,9 @@ const segmentoDoRotulo = "rotulo"
 // tem que ser o Retângulo que o carrega: é dele que vêm a Elevação e o Tom que
 // dão contraste ao texto. Empilhado no fim, um filho qualquer viraria a
 // Superfície.
+//
+// A invariante vale só até atribuiElevacao: depois dela, sobeRotulos leva cada
+// Rótulo para o fim da Camada, para que os filhos não o apaguem da imagem.
 func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto, dest *[]scene.Elemento, x, y, l, a float64) error {
 	if no.Rotulo == "" {
 		return nil
@@ -91,9 +94,7 @@ func posicionaRotulos(camadas []scene.Camada) {
 		}
 	}
 	for k, e := range todos {
-		// O Rótulo de Controle não entra aqui: a caixa dele é escolha do
-		// catálogo, que já a entregou pronta no layout do Controle.
-		if e.Forma != scene.Texto || e.Controle != "" {
+		if !ehRotuloDeRetangulo(*e) {
 			continue
 		}
 		// Invariante de adjacência, estabelecida por rotuloDoRetangulo: o
@@ -102,6 +103,43 @@ func posicionaRotulos(camadas []scene.Camada) {
 			continue
 		}
 		posiciona(e, todos[k-1], todos)
+	}
+}
+
+// ehRotuloDeRetangulo diz se o Elemento é o Rótulo materializado por um `label`
+// de `rect`.
+//
+// O despacho é por Forma, e nunca por `Rotulo != ""`: o Retângulo também carrega
+// o texto na cabeça, e quem varresse por ele acharia dois Elementos por Rótulo.
+// O Rótulo de Controle fica de fora porque a caixa dele é escolha do catálogo, e
+// a pintura dele já está resolvida na ordem das peças do Controle.
+func ehRotuloDeRetangulo(e scene.Elemento) bool {
+	return e.Forma == scene.Texto && e.Controle == ""
+}
+
+// sobeRotulos move cada Rótulo de Retângulo para o fim da sua Camada,
+// preservando a ordem relativa entre eles. Roda depois de atribuiElevacao, e é
+// a segunda metade do arranjo que dá as duas coisas ao mesmo tempo.
+//
+// Emitido junto do dono, o Rótulo ganha dele a Elevação e o Tom — mas é pintado
+// antes dos filhos, e uma barra de cabeçalho apoiada no mesmo topo o apaga da
+// imagem em silêncio, com o `inspect` ainda dizendo que ele está lá. Movido só
+// depois da Elevação, o texto é pintado por cima de tudo que a Camada desenha
+// sem perder o contraste que veio do Retângulo. Uma Camada posterior continua
+// cobrindo: isso é a Elevação funcionando, não defeito.
+func sobeRotulos(camadas []scene.Camada) {
+	for i := range camadas {
+		elementos := camadas[i].Elementos
+		var rotulos []scene.Elemento
+		restantes := elementos[:0]
+		for _, e := range elementos {
+			if ehRotuloDeRetangulo(e) {
+				rotulos = append(rotulos, e)
+				continue
+			}
+			restantes = append(restantes, e)
+		}
+		camadas[i].Elementos = append(restantes, rotulos...)
 	}
 }
 

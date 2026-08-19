@@ -50,6 +50,10 @@ func Arquivo(caminho string) (*scene.Documento, []scene.Aviso, error) {
 		// depende da geometria final de cada Elemento.
 		posicionaRotulos(frame.Camadas)
 		atribuiElevacao(frame.Camadas)
+		// E só depois da Elevação o Rótulo sobe para o fim da Camada: emitido
+		// junto do dono ele é pintado antes dos filhos, e uma barra de
+		// cabeçalho o apagaria da imagem em silêncio.
+		sobeRotulos(frame.Camadas)
 		resolvido.Frames = append(resolvido.Frames, frame)
 	}
 	return resolvido, r.fechaAvisos(), nil
