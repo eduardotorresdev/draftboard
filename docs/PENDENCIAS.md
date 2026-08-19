@@ -48,3 +48,22 @@ apontaria isto, porque o Rótulo **cabe**: é contraste, não corte.
 **Conserto**: derivar o Tom do Rótulo da Superfície que de fato está sob ele no
 momento da pintura, e não da Elevação do dono. Muda a regra de Tom, que hoje é
 puramente estrutural, e por isso é decisão de projeto — ADR, não conserto.
+
+## O Rótulo de Controle largo demais não é diagnosticado
+
+**Origem**: revisão do contrato de F11.
+
+**Cenário**: `- control: button` com `box: {x:5,y:50,w:10,h:8}` e
+`label: "Salvar alterações agora"` num Frame de 400 px. O Rótulo precisa de 73 px
+e a peça de Texto do catálogo tem 33,6: o texto é cortado, em silêncio, como era
+com o Rótulo de Retângulo antes de F11.
+
+**Impacto**: F11 mede só `Forma == Texto && Controle == ""`. O Rótulo de
+Controle fica de fora de propósito — a caixa dele é escolha do catálogo, e o que
+o autor declarou no YAML é `box.w`, que dimensiona o Controle inteiro, não a
+área do Rótulo. Classificá-lo como Aviso faria o `--fix` procurar um `rect.w`
+que não existe e abortar o lote inteiro.
+
+**Conserto**: um diagnóstico próprio, com a chave alargável sendo `box.w` e a
+conta desfazendo a geometria que o catálogo aplica à peça de Texto — que varia
+de Controle para Controle. É fatia própria, não emenda.

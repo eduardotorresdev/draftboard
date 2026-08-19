@@ -396,121 +396,233 @@ Elemento de Texto é `Interno` e o `inspect` o esconde de propósito.
 ### F11 — Diagnóstico por corrigibilidade e `inspect --fix`
 
 Roda **serial**, depois de F9 e F10 integrados (divisibilidade 2). Dono único de
-tudo que toca.
+tudo que toca. Esta é a segunda versão, escrita depois da revisão de contrato:
+oito blockers, e o que os fecha está marcado com **(rev)**.
 
-#### 14. `scene.Elemento.LarguraDoEspaco float64`
+#### 14. `scene.Elemento.Espaco`
 
-A largura, em px, do espaço em que as porcentagens do nó foram projetadas — o
-`esp.L` de `achatamento.go`. Preenchida em **todo** Elemento, pelas mesmas mãos
-que preenchem `Local`.
+    // Espaco é a caixa, em px, do espaço local em que as porcentagens do nó
+    // foram projetadas — o `espaco` de achatamento.go. Preenchido em todo
+    // Elemento.
+    type Espaco struct{ X, Y, L, A float64 }
 
-É geometria, não diagnóstico: nasce em `resolve/` sem violar a proibição do
-item 15, porque não decide nada sobre o que cabe. Existe porque a única forma
-de dizer «o `w` mínimo é 47%» é desfazer a projeção, e só quem projetou conhece
-a base. O Rótulo herda a do Retângulo que o carrega.
+**(rev)** É a caixa inteira, e não só a largura: o eixo vertical projeta por
+`esp.A` e o Círculo projeta o diâmetro por `esp.L` nos dois eixos. Publicar só
+`L` obrigaria a renomear um campo público de `scene` no primeiro pedido de
+sugerir `h:`.
+
+É geometria, não diagnóstico: nasce em `resolve/` sem violar a proibição do item
+15, porque não decide nada sobre o que cabe. Existe porque a única forma de
+dizer «o `w` mínimo é 47%» é desfazer a projeção, e só quem projetou conhece a
+base. O Rótulo herda a do Retângulo que o carrega.
+
+`acrescenta`, `emite` e `rotuloDoRetangulo` não recebem `espaco` hoje: as três
+mudam de assinatura.
 
 #### 15. `internal/diag` — onde o diagnóstico nasce
 
     package diag
     // Confere mede o Documento já resolvido e devolve o que não cabe, separado
-    // por corrigibilidade.
-    func Confere(arquivo string, doc *scene.Documento) ([]scene.Aviso, []*scene.Erro)
+    // por corrigibilidade. alargavel responde se a máquina consegue consertar o
+    // nó sozinha, e por que não quando não consegue; nil significa que nada é
+    // alargável e tudo que não couber é Erro.
+    func Confere(arquivo string, doc *scene.Documento,
+        alargavel func(local string) (bool, string)) ([]scene.Aviso, []*scene.Erro)
 
-`diag` importa `render` (para medir glifos) e `notes` (para `LimiteDaNota`).
+`diag` importa `render` (para medir glifos) e `notes` (para `LimiteDaNota`), e
+**não importa `fix`**: a corrigibilidade chega como predicado, para que `diag`
+seja testável com um predicado de mentira. Quem liga os dois é `comandos.go`.
+
 **Não pode nascer em `internal/resolve/`**: medir texto exige a fonte, e a
 resolução é o único lugar do sistema que hoje calcula geometria sem depender do
 freetype. Quem inverte isso paga com o pacote inteiro.
 
-A régua é sempre `render.NewCanvas(1, 1, 0, 0, 0, 0, 1)`: o diagnóstico é do
-Documento, não da invocação. `--scale` não muda o que cabe.
+A régua é uma só por chamada, `render.NewCanvas(1, 1, 0, 0, 0, 0, 1)`, criada
+antes do laço: cada Canvas carrega o seu cache de faces, e um por Elemento em
+Documento de 10.000 Elementos é 10.000 caches. O diagnóstico é do Documento, não
+da invocação: `--scale` não muda o que cabe.
 
-O Rótulo cabe quando
+**(rev)** A medida, em código real, é
 
-    render.MedeTexto(e.Rotulo, render.TamanhoDoRotulo(e.A)) <= e.L
+    largura, _ := regua.MedeTexto(e.Rotulo, render.TamanhoDoRotulo(e.A))
+    cabe := largura <= e.L
 
-na régua de escala 1, com `e` o Elemento de `Forma: Texto`. O despacho é por
-Forma, nunca por `Rotulo != ""` (item 3). O respiro já está descontado de `e.L`
-pela resolução (item 5) — `diag` não o desconta de novo.
+`MedeTexto` é método de `*Canvas` e devolve dois valores.
 
-#### 16. As três categorias
+**(rev)** Os Elementos medidos são exatamente os de `Forma == scene.Texto &&
+Controle == ""` — a mesma condição de `ehRotuloDeRetangulo`. O Rótulo de
+Controle fica **fora do escopo de F11**: a caixa dele é escolha do catálogo, o
+YAML do autor não tem `rect.w` para alargar (tem `box.w`, que dimensiona o
+Controle inteiro), e classificá-lo junto travaria o `--fix` do Documento
+inteiro. Registrado como pendência.
+
+**(rev)** F11 **não diagnostica transbordo vertical**, e isso é decisão, não
+esquecimento: `posiciona` satura a altura da área em `min(alturaDoRotulo, A)` e
+`TamanhoDoRotulo` é `0,45 * A`, então a caixa de linha fica em torno de `0,52 *
+A` e cabe por construção. Não existe Rótulo de Retângulo que estoure na
+vertical.
+
+#### 16. As categorias, decididas por corrigibilidade real
+
+**(rev)** A categoria não é escolhida por onde o Retângulo mora, e sim pelo que
+a máquina de fato consegue consertar. É **Aviso** quando **todas** valem:
+
+- `Origem == ""` — o Retângulo foi escrito direto no Documento;
+- `e.Espaco.L` é finita e maior que zero;
+- `alargavel(e.Local)` responde `true` — o `Local` resolve, o nó é `rect`, tem
+  `w` declarado como escalar simples, e não está dentro de uma Repetição.
+
+Qualquer outra combinação é **Erro**. Sem essa inversão, `diag` emitiria Aviso
+para nó que `fix` não sabe endereçar, e um lote com um único nó assim não
+escreveria nenhuma das outras correções.
+
+Cada exclusão tem uma razão que a mensagem carrega:
 
 | Situação | Categoria | Por quê |
 | --- | --- | --- |
-| Rótulo não cabe, Retângulo escrito direto no Documento (`Origem == ""`) | **Aviso** | A máquina conserta sozinha: `--fix` alarga o `w`. |
-| Rótulo não cabe dentro de um Componente (`Origem != ""`) | **Erro** | Alargar ali muda **todas** as Instâncias: é juízo do autor. |
-| Nota acima de `notes.LimiteDaNota` runas | **Erro** | Não há largura a alargar; encurtar o texto é juízo do autor. |
+| Cabe tudo acima | **Aviso** | `--fix` alarga o `w` e acabou. |
+| `Origem != ""` | **Erro** | Alargar no Componente muda **todas** as Instâncias. |
+| Nó sem `w` declarado | **Erro** | Não há valor a trocar; escrever um `w` novo é escolher a largura por conta. |
+| Nó dentro de Repetição | **Erro** | O `w` é o passo da Repetição (`tamanhoNoEixo`): alargar reposiciona todos os clones. |
+| `Espaco.L` zero ou não finita | **Erro** | A porcentagem não tem base; a resolução já avisou da área zero. |
+| Nota acima de `notes.LimiteDaNota` runas | **Erro** | Não há largura a alargar. |
 
 O Rótulo largo demais é **cortado, nunca quebrado** — isto já é o que
 `desenhaRotulo` faz e F11 não muda. O diagnóstico existe justamente porque o
 corte é silencioso.
 
-Mensagens congeladas, literais:
+**(rev)** A largura necessária é a do **Retângulo**, não a da área do Rótulo: a
+resolução já descontou o respiro (item 5). O par se acha pelo Caminho — o Rótulo
+é `<caminho do dono>/rotulo`, com `resolve.SegmentoDoRotulo` exportado para que
+não haja duas grafias do sufixo:
 
-    o Rótulo %q não cabe no Retângulo: precisa de %.0f px e tem %.0f; use w: %.0f
-    o Rótulo %q não cabe no Retângulo do Componente: precisa de %.0f px e tem %.0f; encurte o Rótulo ou alargue a caixa no Componente
-    a Nota tem %d runas, acima do limite de %d; encurte-a ou mova o texto para o Documento
+    necessarioNoRetangulo := largura + (dono.L - rotulo.L)
+    w := math.Ceil(100 * necessarioNoRetangulo / dono.Espaco.L)
 
-O `w:` sugerido é `100 * necessario / e.LarguraDoEspaco`, arredondado **para
-cima** ao inteiro: um `w` que arredonda para baixo continua cortando, e um
-Aviso que sugere um conserto que não conserta é pior que nenhum.
+Arredondado **para cima**: um `w` que arredonda para baixo continua cortando, e
+um Aviso que sugere um conserto que não conserta é pior que nenhum. Sem o
+respiro de volta, o `w` sai sistematicamente `2 * respiroDoRotulo` px curto — 34
+onde precisava de 37, medido na revisão.
+
+**(rev)** Mensagens congeladas, literais. `%s` de `w` é
+`strconv.FormatFloat(v, 'g', -1, 64)`:
+
+    o Rótulo %q não cabe no Retângulo: precisa de %.0f px e tem %.0f; use w: %s
+    o Rótulo %q não cabe no Retângulo: precisa de %.0f px e tem %.0f; %s
+    a Nota tem %d runas, acima do limite de %d; encurte-a
+
+O `%s` final da segunda é a razão, uma destas, também literais:
+
+    o Retângulo vem de um Componente, e alargá-lo lá muda todas as Instâncias
+    o Retângulo não declara "w"
+    o Retângulo está dentro de uma Repetição, e alargá-lo reposiciona os clones
+    o espaço do Retângulo tem largura zero
+
+Nenhuma mensagem diz `caixa` (é `_Avoid_` de Retângulo) nem `texto` (é `_Avoid_`
+de Rótulo e de Nota). A isenção nominal do item 12 vale só para o identificador
+`scene.Texto`.
 
 #### 17. O Erro de F11 não aborta
 
 Os Erros de `diag` são impressos como erro, o processo sai com 1, **e o comando
-faz o seu trabalho assim mesmo**: `render` escreve as imagens, `inspect`
-imprime a árvore, `board` escreve a Prancheta.
+faz o seu trabalho assim mesmo**: `render` escreve as imagens, `inspect` imprime
+a árvore, `board` escreve a Prancheta.
 
 Os Erros antigos — decode, Componente ausente, teto de área, teto de nós —
-continuam abortando. A diferença é de natureza: aqueles impedem de saber o que
-desenhar, este descreve um desenho que já existe e está errado.
+continuam abortando. A diferença é de natureza, e é a mesma que o `CONTEXT.md`
+já escreve na verbete de Erro: aqueles impedem de saber o que desenhar, este
+descreve um desenho que já existe e está errado.
 
-Ordem de saída no stderr: primeiro os Avisos da resolução, depois os Avisos de
-`diag`, depois os Erros de `diag`. Todos no formato de `scene.Aviso`/`scene.Erro`
-que já existe, com `Arquivo` e `Local` — é `Local` que o `--fix` endereça.
+Ordem de saída no stderr: Avisos da resolução, Avisos de `diag`, Erros de
+`diag`. No formato de `scene.Aviso`/`scene.Erro` que já existe, com `Arquivo` e
+`Local` — é `Local` que o `--fix` endereça.
 
-Vale nos quatro comandos: `render`, `inspect`, `validate`, `board`.
+Vale nos quatro comandos: `render`, `inspect`, `validate`, `board`. **(rev)**
+Inclusive o Erro da Nota longa em `render` sem `--notes`, que não desenha Nota
+nenhuma: o artefato diagnosticado é o **Documento**, não a invocação, pela mesma
+razão que a régua é de escala 1. Um Documento não fica correto por ser
+renderizado com a opção que esconde o defeito.
 
 #### 18. `internal/fix` — a cirurgia de bytes
 
     package fix
-    // Correcao é a troca de um único valor escalar num arquivo YAML.
-    type Correcao struct {
-        Local string  // "frames[0].layers[0].elements[2]"
-        W     float64 // o novo valor de `w`, em porcentagem
-    }
-    // Aplica reescreve o arquivo trocando o `w` de cada nó endereçado, e
-    // devolve o que trocou, na ordem de Correcao.
-    func Aplica(arquivo string, correcoes []Correcao) ([]Troca, error)
+    // Abre lê o arquivo YAML cru e indexa os nós endereçáveis.
+    func Abre(arquivo string) (*Arquivo, error)
+    // Alargavel diz se o Local endereça um `rect` com `w` alargável pela
+    // máquina, e a razão quando não.
+    func (a *Arquivo) Alargavel(local string) (bool, string)
+    // Alarga registra a troca do `w` de um nó. Nada é escrito até Grava.
+    func (a *Arquivo) Alarga(local string, w float64) error
+    // Grava escreve todas as trocas de uma vez e devolve o que trocou, na ordem
+    // em que foram registradas.
+    func (a *Arquivo) Grava() ([]Troca, error)
     type Troca struct{ Local string; De, Para float64 }
 
-`fix` reabre o YAML com `yaml.Node`, navega pelo `Local` até o nó `rect`, acha
-a chave `w` e troca **só os bytes do escalar**, usando `Line`/`Column` do nó do
-valor. Não reserializa o documento: reserializar perde comentários, ordem e
-estilo de bloco, e o autor não pediu para reformatar o arquivo — pediu um
-número maior.
+**(rev)** É um punhado com estado, e não uma lista de correções, porque a mesma
+leitura do arquivo serve ao predicado do item 16 e à cirurgia: parsear duas
+vezes abriria a janela para o arquivo mudar entre uma e outra.
+
+`Alarga` recusa `w` não finito ou não positivo. `Grava` num punhado vazio não
+toca o arquivo.
+
+**(rev)** Gramática dos segmentos que `Alargavel` aceita, e ela é fechada:
+
+    frames[i] .layers[i] .elements[i] .default[i] .slots.<nome>
+
+`Local` que contenha `" -> "` é de Componente e nunca chega aqui — `Origem !=
+""` já o barrou no item 16. O segmento `.slots.<nome>` é ambíguo quando o nome
+do Slot tem ponto: casa-se o **nome mais longo** que exista de fato entre as
+chaves do mapa `slots` daquele nó. Local que não resolva devolve
+`(false, ...)`, nunca pânico.
+
+**(rev)** A posição vem de `Line`/`Column` do nó do **valor**, e `Column` conta
+**runas, não bytes**: converter percorrendo a linha com `utf8.DecodeRune` até a
+coluna pedida. Num projeto inteiro em português, um `label` acentuado na mesma
+linha do `w` desloca o splice e corrompe o arquivo do autor.
+
+**(rev)** Todos os deslocamentos são calculados contra o buffer **original** e
+aplicados em ordem **decrescente** de (linha, coluna), para que uma troca não
+empurre a seguinte. A ordem devolvida em `Troca` continua sendo a de registro.
+
+Só os bytes do escalar são trocados. Não reserializa o documento: reserializar
+perde comentários, ordem e estilo de bloco, e o autor não pediu para reformatar
+o arquivo — pediu um número maior.
 
 `schema.No` **não** ganha posição. A posição é conhecimento de quem faz
-cirurgia, e mantê-la fora do schema é o que impede o resto do sistema de
-começar a raciocinar sobre linhas de arquivo.
+cirurgia, e mantê-la fora do schema é o que impede o resto do sistema de começar
+a raciocinar sobre linhas de arquivo.
 
-Se o nó não tiver `w` declarado, ou o `Local` não resolver, `Aplica` devolve
-`*scene.Erro` sem escrever byte nenhum: o arquivo é do autor, e um conserto
-parcial é pior que nenhum.
+**(rev)** Escrita: `Grava` monta o buffer inteiro em memória, resolve symlink
+até o alvo real, escreve em arquivo temporário **no mesmo diretório**, copia o
+modo do original e faz `os.Rename`. Nada de truncar em cima: um processo morto
+no meio levaria o Documento junto. Se o arquivo mudou de tamanho ou de mtime
+desde `Abre`, `Grava` recusa com
+
+    o arquivo mudou no disco desde a leitura; rode o comando de novo
+
+Erro de permissão sai como `*scene.Erro` do domínio, não como o erro cru do
+sistema operacional.
 
 #### 19. `inspect --fix`
 
 Conserta e imprime a árvore já corrigida numa chamada só.
 
-- Só os **Avisos** de `diag` viram `Correcao` — Erro nunca, por definição da
+- Só os **Avisos** de `diag` viram troca — Erro nunca, por definição da
   categoria (item 16). Componente jamais é tocado.
-- Só o `w` é alargado. Nunca `h`, nunca `x`, nunca `y`, nunca o texto.
-- Depois de escrever, o Documento é **resolvido de novo** e é essa árvore que
-  vai para o stdout. Imprimir a árvore velha diria ao agente que o conserto não
+- Só o `w` é alargado. Nunca `h`, nunca `x`, nunca `y`, nunca o Rótulo.
+- Depois de gravar, o Documento é **resolvido de novo** e é essa árvore que vai
+  para o stdout. Imprimir a árvore velha diria ao agente que o conserto não
   aconteceu.
-- As linhas de troca vão para o **stderr**, uma por conserto, antes da árvore:
+- As linhas de troca vão para o **stderr**, uma por conserto, antes de tudo:
 
       frames[0].layers[0].elements[2]: w 20 → 47
 
+  Os dois números com `strconv.FormatFloat(v, 'g', -1, 64)`, e `De` é o valor
+  **decodificado**, não o texto original: um `w: 2e1` imprime `20`.
+- **(rev)** A segunda resolução **imprime tudo** — Avisos dela e diagnóstico de
+  `diag` — depois das linhas de troca. Alargar um Retângulo encostado na borda
+  direita produz um Aviso novo de "fora do Frame", e escondê-lo faria o
+  `inspect --fix` mostrar menos que o `inspect` puro.
 - Sem nada a consertar, `--fix` não escreve no arquivo e se comporta como
   `inspect` puro.
 - `--fix` só existe em `inspect`. Em qualquer outro comando é erro de uso.
@@ -518,40 +630,63 @@ Conserta e imprime a árvore já corrigida numa chamada só.
 
 #### 20. Superfícies que seguem F11
 
-- `internal/skill/SKILL.md`: seção de diagnóstico (as três categorias e o que
-  cada uma quer do autor), `inspect --fix` no bloco de uso, e a regra de que o
-  Rótulo é cortado e nunca quebrado.
+- `internal/skill/SKILL.md`: seção de diagnóstico (as categorias e o que cada
+  uma quer do autor), `inspect --fix` no bloco de uso, e a regra de que o Rótulo
+  é cortado e nunca quebrado.
 - `CONTRACT.md`: `diag`, `fix`, `--fix`, o §7 do `--notes` com a forma `=`
   (pendência que F10 deixou), e a nova categoria de Erro que não aborta.
 - `docs/PRD.md`: aposentar o modo margem e o Chrome do texto (itens 32, 36, 37,
   §356-366, §452 e o glossário do §489), e registrar o diagnóstico por
   corrigibilidade.
-- `internal/render/texto.go:34` e `f6_test.go:47`: comentários que ainda falam
-  de Chrome e de margem.
+- **(rev)** Comentários que ainda falam de Chrome ou de modo margem fora de
+  `internal/render/`: `f6_test.go:46`, `main_test.go:455`, `main_test.go:531`.
+  Mais `internal/render/texto.go:34`, que é o único de dentro do pacote que F11
+  arruma. `main_test.go` entra na lista de caminhos de F11, só para comentário.
 
-**Fora do escopo**, e registrado como issue: as quatro margens de
-`render.NewCanvas`/`DesenhaFrame` estão mortas em produção desde F10 (todos os
-chamadores passam 0), e o pacote `render` inteiro ainda está documentado e
-testado em termos de Chrome. Arrancá-las é refatoração além desta entrega.
+**Fora do escopo**, e registrado em `docs/PENDENCIAS.md`: as quatro margens de
+`render.NewCanvas`/`DesenhaFrame`, mortas em produção desde F10, e o resto do
+pacote `render` ainda documentado em termos de Chrome. E o Rótulo de Controle
+largo demais, que F11 não diagnostica (item 15).
 
 #### Definição de pronto — F11
 
 - [ ] `go run . render <doc com Rótulo largo demais>` escreve a imagem, imprime
       o Aviso com o `w` mínimo e sai com 0.
-- [ ] O mesmo Rótulo dentro de um Componente escreve a imagem, imprime o Erro e
-      sai com **1**.
-- [ ] `go run . inspect --fix <doc>` reescreve o `w` no arquivo, imprime
-      `frames[0]...: w 20 → 47` no stderr e a árvore **corrigida** no stdout; o
-      Aviso não aparece mais numa segunda chamada.
-- [ ] O `w` sugerido de fato conserta: rodar `--fix` duas vezes não muda nada na
-      segunda.
-- [ ] `--fix` num Documento cujo único Aviso vem de Componente não escreve byte
-      nenhum e sai com 1.
-- [ ] Um `w` com comentário na mesma linha sobrevive à cirurgia.
-- [ ] Nota de 201 runas: Erro, imagem escrita, saída 1.
+- [ ] **O `w` sugerido conserta de primeira**: aplicá-lo e rodar de novo não
+      produz Aviso. `go run . inspect --fix` duas vezes seguidas: a segunda não
+      imprime troca nenhuma e não muda um byte do arquivo.
+- [ ] O mesmo Rótulo dentro de um Componente escreve a imagem, imprime o Erro
+      com a razão do Componente, e sai com **1**.
+- [ ] **(rev)** Retângulo rotulado **sem `w` declarado**, e outro **dentro de uma
+      Repetição**: Erro, cada um com a sua razão. Um Documento que misture os
+      dois com cinco Retângulos consertáveis conserta os cinco e sai com 1.
+- [ ] **(rev)** Slot de `box: {w: 0}` preenchido com Retângulo rotulado: Erro de
+      largura zero, e nenhum `+Inf` em mensagem nem em arquivo.
+- [ ] `go run . inspect --fix <doc>` reescreve o `w`, imprime
+      `frames[0]...: w 20 → 47` no stderr e a árvore **corrigida** no stdout.
+- [ ] **(rev)** `--fix` num Documento cujo único diagnóstico é Erro não escreve
+      byte nenhum e sai com 1.
+- [ ] **(rev)** Sobrevivem à cirurgia: comentário na mesma linha do `w`; `label`
+      **acentuado** na mesma linha do `w`; dois `w` na mesma linha; `w: 2e1` em
+      estilo de fluxo; `w` em estilo de bloco.
+- [ ] **(rev)** `--fix` num arquivo somente-leitura falha com `*scene.Erro` do
+      domínio e deixa o arquivo intacto.
+- [ ] **(rev)** Consertar um Retângulo encostado na borda direita imprime o
+      Aviso novo de "fora do Frame" na mesma chamada, e o código de saída
+      continua 0.
+- [ ] Nota de 201 runas: Erro, imagem escrita, saída 1. 200 runas: nada. A conta
+      é em runas — 200 runas acentuadas não disparam.
+- [ ] **(rev)** Os quatro comandos diagnosticam, e os quatro códigos de saída
+      são conferidos: `render`, `inspect`, `validate` e `board` saem 1 com um
+      Erro de `diag`, tendo escrito o que tinham para escrever.
 - [ ] `--fix` em `render`, `board` ou `validate` é erro de uso.
-- [ ] SKILL.md, CONTRACT.md e PRD.md atualizados; nenhum comentário de código
-      fora de `internal/render/` fala mais em Chrome ou modo margem.
+- [ ] O diagnóstico não muda com `--scale 1` e `--scale 8`.
+- [ ] SKILL.md, CONTRACT.md e PRD.md atualizados, e
+
+          grep -rn Chrome --include='*.go' . | grep -v '^\./\.claude/' \
+            | grep -v '^\./internal/render/' | grep -v TomChrome
+
+      não acha nada.
 
 ## Gate
 
@@ -559,4 +694,4 @@ Local, sem CI de teste:
 
     go build ./... && go vet ./... && gofmt -l . && go test ./...
 
-Baseline em `cb909b9`: verde, 298 testes.
+Baseline em `cb909b9`: verde, 298 testes. Depois de F9 e F10 integrados: 350.
