@@ -235,6 +235,11 @@ func TestConsertosSaoDeduplicadosPorLocal(t *testing.T) {
 		append([]scene.Elemento{}, alto.Camadas[0].Elementos...),
 		baixo.Camadas[0].Elementos...)}}
 
+	avisos, _ := Confere("doc.yaml", documento(juntos), sempreAlargavel)
+	if len(avisos) != 1 {
+		t.Fatalf("avisos = %v; queria um só: a frase é sobre o nó, não sobre cada peça que ele materializa", avisos)
+	}
+
 	consertos := Alargamentos(documento(juntos), sempreAlargavel)
 	if len(consertos) != 1 {
 		t.Fatalf("consertos = %v; queria um só, deduplicado por Local", consertos)

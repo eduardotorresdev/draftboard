@@ -54,7 +54,7 @@ func imprimeUso(w io.Writer) {
 	fmt.Fprint(w, `uso:
   draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes] [--layers]
   draftboard board    <arquivo.yaml> [--out DIR]
-  draftboard inspect  <arquivo.yaml>
+  draftboard inspect  <arquivo.yaml> [--fix]
   draftboard validate <arquivo.yaml>
   draftboard skill    [--install [DIR]] [--sync [DIR]] [--yes] [--no]
   draftboard version

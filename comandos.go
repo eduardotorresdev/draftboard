@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/eduardotorresdev/draftboard/internal/board"
+	"github.com/eduardotorresdev/draftboard/internal/diag"
+	"github.com/eduardotorresdev/draftboard/internal/fix"
 	"github.com/eduardotorresdev/draftboard/internal/inspect"
 	"github.com/eduardotorresdev/draftboard/internal/notes"
 	"github.com/eduardotorresdev/draftboard/internal/render"
@@ -33,6 +35,7 @@ func comandoRender(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return imprimeErro(stderr, err)
 	}
+	codigo := diagnostica(stderr, o.arquivo, doc)
 	if err := os.MkdirAll(o.saida, 0o755); err != nil {
 		// Erro de linha de comando não tem arquivo nem localização: não usa
 		// o formato de `scene.Erro`.
@@ -48,7 +51,7 @@ func comandoRender(args []string, stdout, stderr io.Writer) int {
 			return imprimeErro(stderr, err)
 		}
 	}
-	return 0
+	return codigo
 }
 
 // escreveFrame gera as imagens de um Frame e devolve os caminhos escritos.
@@ -144,6 +147,7 @@ func comandoBoard(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return imprimeErro(stderr, err)
 	}
+	codigo := diagnostica(stderr, o.arquivo, doc)
 	if err := cabeNoNavegador(o.arquivo, doc); err != nil {
 		return imprimeErro(stderr, err)
 	}
@@ -156,7 +160,7 @@ func comandoBoard(args []string, stdout, stderr io.Writer) int {
 		return imprimeErro(stderr, err)
 	}
 	fmt.Fprintln(stdout, caminho)
-	return 0
+	return codigo
 }
 
 // cabeNoNavegador recusa, antes de montar qualquer HTML, o Documento cuja
@@ -190,8 +194,122 @@ func escrevePrancheta(caminho string, doc *scene.Documento) error {
 	return nil
 }
 
-// comandoInspect imprime a árvore resolvida no stdout. Nada é escrito em disco.
+// comandoInspect imprime a árvore resolvida no stdout. Nada é escrito em disco,
+// a menos que `--fix` peça o conserto.
 func comandoInspect(args []string, stdout, stderr io.Writer) int {
+	o, err := interpretaInspect(args)
+	if err != nil {
+		return usoInvalido(stderr, err)
+	}
+	if o.corrige {
+		return consertaEInspeciona(o.arquivo, stdout, stderr)
+	}
+	doc, avisos, err := resolve.Arquivo(o.arquivo)
+	imprimeAvisos(stderr, avisos)
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	codigo := diagnostica(stderr, o.arquivo, doc)
+	if err := inspect.Arvore(stdout, doc); err != nil {
+		return imprimeErro(stderr, err)
+	}
+	return codigo
+}
+
+// consertaEInspeciona alarga o `w` de cada Retângulo cujo Rótulo não cabe e
+// imprime a árvore JÁ CORRIGIDA. As duas coisas numa chamada só porque imprimir
+// a árvore velha diria ao agente que o conserto não aconteceu.
+//
+// A ordem no stderr é: as linhas de troca primeiro, e depois tudo o que a
+// segunda resolução tem a dizer — os Avisos dela e o diagnóstico. Alargar um
+// Retângulo encostado na borda direita produz um Aviso novo de "fora do Frame",
+// e escondê-lo faria o `--fix` mostrar menos que o `inspect` puro.
+func consertaEInspeciona(arquivo string, stdout, stderr io.Writer) int {
+	doc, avisos, err := resolve.Arquivo(arquivo)
+	if err != nil {
+		imprimeAvisos(stderr, avisos)
+		return imprimeErro(stderr, err)
+	}
+	arq, erroDeLeitura := fix.Abre(arquivo)
+	var consertos []diag.Alargamento
+	if erroDeLeitura == nil {
+		consertos = diag.Alargamentos(doc, arq.Alargavel)
+	}
+	if len(consertos) == 0 {
+		// Sem nada a consertar, `--fix` não escreve no arquivo e se comporta
+		// como o `inspect` puro: um Documento cujo único diagnóstico é Erro
+		// não pode perder nem o mtime por ter sido inspecionado.
+		imprimeAvisos(stderr, avisos)
+		codigo := diagnostica(stderr, arquivo, doc)
+		if err := inspect.Arvore(stdout, doc); err != nil {
+			return imprimeErro(stderr, err)
+		}
+		return codigo
+	}
+	for _, c := range consertos {
+		if err := arq.Alarga(c.Local, c.W); err != nil {
+			return imprimeErro(stderr, err)
+		}
+	}
+	trocas, err := arq.Grava()
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	for _, t := range trocas {
+		fmt.Fprintf(stderr, "%s: w %s → %s\n", t.Local, formataLargura(t.De), formataLargura(t.Para))
+	}
+
+	doc, avisos, err = resolve.Arquivo(arquivo)
+	imprimeAvisos(stderr, avisos)
+	if err != nil {
+		return imprimeErro(stderr, err)
+	}
+	codigo := diagnostica(stderr, arquivo, doc)
+	if err := inspect.Arvore(stdout, doc); err != nil {
+		return imprimeErro(stderr, err)
+	}
+	return codigo
+}
+
+// diagnostica mede o Documento já resolvido e imprime o que não cabe. Devolve o
+// código de saída: 1 quando sobrou Erro.
+//
+// O Erro daqui NÃO aborta o comando, e essa é a diferença de natureza que o
+// vocabulário já registra: os Erros antigos impedem de saber o que desenhar,
+// este descreve um desenho que já existe e está errado. O comando escreve o que
+// tinha para escrever e só o código de saída muda.
+func diagnostica(stderr io.Writer, arquivo string, doc *scene.Documento) int {
+	avisos, erros := diag.Confere(arquivo, doc, predicadoDeAlargamento(arquivo))
+	imprimeAvisos(stderr, avisos)
+	for _, e := range erros {
+		fmt.Fprintln(stderr, "erro: "+e.Error())
+	}
+	if len(erros) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// predicadoDeAlargamento abre o YAML cru só para responder se a máquina
+// consegue alargar cada nó sozinha. Arquivo que não abre devolve nil: o
+// diagnóstico continua, e tudo que não couber vira Erro — dizer "use w: 47"
+// sobre um arquivo que não se consegue ler seria prometer um conserto que
+// ninguém vai aplicar.
+func predicadoDeAlargamento(arquivo string) func(string) (bool, string) {
+	a, err := fix.Abre(arquivo)
+	if err != nil {
+		return nil
+	}
+	return a.Alargavel
+}
+
+// formataLargura escreve a largura como o autor a reconhece no arquivo: sem
+// notação científica inventada e sem casas decimais que ele não digitou.
+func formataLargura(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }
+
+// comandoValidate resolve o Documento sem produzir saída: nada no stdout em
+// caso de sucesso, avisos no stderr, código 1 só quando há erro.
+func comandoValidate(args []string, stderr io.Writer) int {
 	caminho, err := interpretaArquivo(args)
 	if err != nil {
 		return usoInvalido(stderr, err)
@@ -201,25 +319,7 @@ func comandoInspect(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return imprimeErro(stderr, err)
 	}
-	if err := inspect.Arvore(stdout, doc); err != nil {
-		return imprimeErro(stderr, err)
-	}
-	return 0
-}
-
-// comandoValidate resolve o Documento sem produzir saída: nada no stdout em
-// caso de sucesso, avisos no stderr, código 1 só quando há erro.
-func comandoValidate(args []string, stderr io.Writer) int {
-	caminho, err := interpretaArquivo(args)
-	if err != nil {
-		return usoInvalido(stderr, err)
-	}
-	_, avisos, err := resolve.Arquivo(caminho)
-	imprimeAvisos(stderr, avisos)
-	if err != nil {
-		return imprimeErro(stderr, err)
-	}
-	return 0
+	return diagnostica(stderr, caminho, doc)
 }
 
 // comandoSkill imprime a skill embutida, ou a grava e imprime o caminho

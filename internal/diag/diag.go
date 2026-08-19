@@ -55,29 +55,14 @@ func Confere(arquivo string, doc *scene.Documento, alargavel func(local string) 
 }
 
 // Alargamentos devolve os consertos correspondentes aos Avisos que Confere
-// emitiria, deduplicados por Local.
-//
-// A deduplicação é por Local, e não por Caminho, porque é o nó do YAML que a
-// cirurgia endereça: dois Elementos do mesmo nó pediriam a mesma troca duas
-// vezes, e a segunda mediria os bytes que a primeira já moveu. Empatando,
-// vence a maior largura — a menor deixaria o Rótulo cortado do mesmo jeito.
+// emitiria: um por nó do YAML, na ordem em que foram medidos.
 func Alargamentos(doc *scene.Documento, alargavel func(local string) (bool, string)) []Alargamento {
-	var ordem []string
-	maior := map[string]float64{}
+	var consertos []Alargamento
 	for _, a := range confere(doc, alargavel) {
 		if a.razao != "" || a.w <= 0 {
 			continue
 		}
-		if _, visto := maior[a.local]; !visto {
-			ordem = append(ordem, a.local)
-		}
-		if a.w > maior[a.local] {
-			maior[a.local] = a.w
-		}
-	}
-	consertos := make([]Alargamento, 0, len(ordem))
-	for _, local := range ordem {
-		consertos = append(consertos, Alargamento{Local: local, W: maior[local]})
+		consertos = append(consertos, Alargamento{Local: a.local, W: a.w})
 	}
 	return consertos
 }
@@ -146,7 +131,39 @@ func confere(doc *scene.Documento, alargavel func(local string) (bool, string)) 
 			}
 		}
 	}
-	return achados
+	return deduplica(achados)
+}
+
+// deduplica reduz os achados a um por nó do YAML.
+//
+// A deduplicação é por Local, e não por Caminho, porque é do nó que o autor
+// escreveu que o diagnóstico fala: uma Repetição de dez clones repetiria a
+// mesma frase dez vezes, e o `--fix` tentaria dez cirurgias no mesmo `w` — a
+// segunda medindo os bytes que a primeira já moveu. Empatando, vence quem
+// precisa de mais largura: a menor deixaria o Rótulo cortado do mesmo jeito.
+func deduplica(achados []achado) []achado {
+	unicos := make([]achado, 0, len(achados))
+	onde := map[chave]int{}
+	for _, a := range achados {
+		c := chave{local: a.local, nota: a.ehNotaComprida}
+		i, visto := onde[c]
+		if !visto {
+			onde[c] = len(unicos)
+			unicos = append(unicos, a)
+			continue
+		}
+		if a.precisa > unicos[i].precisa {
+			unicos[i] = a
+		}
+	}
+	return unicos
+}
+
+// chave separa os dois diagnósticos que um mesmo nó pode receber: um Rótulo que
+// não cabe e uma Nota comprida são problemas diferentes do mesmo Local.
+type chave struct {
+	local string
+	nota  bool
 }
 
 // razaoSemConserto marca o achado que não é sobre largura nenhuma. Não chega a
