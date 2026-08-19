@@ -124,6 +124,7 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"posição do sufixo rotulo=":           "de Componente. `para=` só aparece para Elementos que declaram Ligação. `rotulo=` fecha a",
 		"Nota entre aspas na árvore":          "        nota: \"<texto>\"",
 		"teto do label do Retângulo":          "- O texto do Rótulo tem teto de **200 runas**: acima disso a decodificação recusa o",
+		"teto da fonte no diagnóstico":        "**Limite conhecido**: acima de `--scale` ~20 a rasterização satura a fonte em 256 px",
 	}
 	for fato, linha := range linhas {
 		if !contemLinha(c, linha) {

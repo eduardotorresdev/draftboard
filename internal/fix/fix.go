@@ -41,6 +41,16 @@ const (
 	RazaoRepeticao = "o Retângulo está dentro de uma Repetição, e alargá-lo reposiciona os clones"
 )
 
+// ErroDeMudancaNoDisco é a recusa de quem mediu um Documento e foi gravar em
+// outro. É exportada porque a CLI lê o arquivo duas vezes — uma para resolver e
+// medir, outra para operar os bytes — e a recusa das duas janelas tem que ser a
+// mesma frase: duas grafias fariam o agente tratar como dois problemas o que é
+// um só.
+func ErroDeMudancaNoDisco(arquivo string) error {
+	return &scene.Erro{Arquivo: arquivo,
+		Msg: "o arquivo mudou no disco desde a leitura; rode o comando de novo"}
+}
+
 // Troca é uma largura trocada: o Local do nó, o valor que estava declarado e o
 // que passou a estar. `De` é o valor decodificado, e não o texto original — um
 // `w: 2e1` é reportado como 20, que é o número com que o autor de fato desenha.
@@ -99,8 +109,7 @@ func Abre(arquivo string) (*Arquivo, error) {
 		return nil, erroDeArquivo(arquivo, err, "não foi possível ler o Documento")
 	}
 	if depois.Size() != antes.Size() || !depois.ModTime().Equal(antes.ModTime()) {
-		return nil, &scene.Erro{Arquivo: arquivo,
-			Msg: "o arquivo mudou no disco desde a leitura; rode o comando de novo"}
+		return nil, ErroDeMudancaNoDisco(arquivo)
 	}
 	info := antes
 	var doc yaml.Node
@@ -184,8 +193,7 @@ func (a *Arquivo) Grava() ([]Troca, error) {
 	// Reler não bastaria: os deslocamentos foram medidos contra o buffer da
 	// leitura, e aplicá-los num arquivo que mudou embaralharia o YAML.
 	if info.Size() != a.tamanho || !info.ModTime().Equal(a.mtime) {
-		return nil, &scene.Erro{Arquivo: a.caminho,
-			Msg: "o arquivo mudou no disco desde a leitura; rode o comando de novo"}
+		return nil, ErroDeMudancaNoDisco(a.caminho)
 	}
 
 	novo, err := a.buffer()

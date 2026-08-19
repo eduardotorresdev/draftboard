@@ -225,12 +225,23 @@ func comandoInspect(args []string, stdout, stderr io.Writer) int {
 // Retângulo encostado na borda direita produz um Aviso novo de "fora do Frame",
 // e escondê-lo faria o `--fix` mostrar menos que o `inspect` puro.
 func consertaEInspeciona(arquivo string, stdout, stderr io.Writer) int {
+	// O Documento é lido duas vezes — uma para resolver e medir, outra para
+	// operar os bytes — e os Local medidos na primeira são aplicados na
+	// segunda. Reescrito entre as duas trocando a ordem dos `elements`,
+	// `frames[0].layers[0].elements[0]` passa a endereçar outro Retângulo, e o
+	// `--fix` alargaria um `w` cujo Rótulo cabia. O tamanho e o mtime da
+	// primeira amarram as duas leituras ao mesmo conteúdo.
+	antes, erroDoStat := os.Stat(arquivo)
 	doc, avisos, err := resolve.Arquivo(arquivo)
 	if err != nil {
 		imprimeAvisos(stderr, avisos)
 		return imprimeErro(stderr, err)
 	}
+	entreAsDuasLeituras()
 	arq, erroDeLeitura := fix.Abre(arquivo)
+	if erroDeLeitura == nil && mudouDesde(antes, erroDoStat, arquivo) {
+		return imprimeErro(stderr, fix.ErroDeMudancaNoDisco(arquivo))
+	}
 	var consertos []diag.Alargamento
 	if erroDeLeitura == nil {
 		consertos = diag.Alargamentos(doc, arq.Alargavel)
@@ -269,6 +280,25 @@ func consertaEInspeciona(arquivo string, stdout, stderr io.Writer) int {
 		return imprimeErro(stderr, err)
 	}
 	return codigo
+}
+
+// entreAsDuasLeituras é um ponto de costura: a guarda que amarra a leitura do
+// diagnóstico à da cirurgia só se prova com o Documento sendo reescrito
+// exatamente entre as duas, e não há como provocar essa janela de fora.
+var entreAsDuasLeituras = func() {}
+
+// mudouDesde diz se o Documento no disco não é mais o que a primeira leitura
+// viu. Stat que não deu certo conta como mudança: sem o par de referência não
+// há como afirmar que as duas leituras viram o mesmo arquivo.
+func mudouDesde(antes os.FileInfo, erroDoStat error, arquivo string) bool {
+	if erroDoStat != nil || antes == nil {
+		return true
+	}
+	depois, err := os.Stat(arquivo)
+	if err != nil {
+		return true
+	}
+	return depois.Size() != antes.Size() || !depois.ModTime().Equal(antes.ModTime())
 }
 
 // diagnostica mede o Documento já resolvido e imprime o que não cabe. Devolve o

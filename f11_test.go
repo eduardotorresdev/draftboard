@@ -376,3 +376,52 @@ func TestEspacoDeLarguraZeroNaoVazaInfinito(t *testing.T) {
 		t.Errorf("o Documento foi mexido:\n%s", depois)
 	}
 }
+
+// TestFixRecusaDocumentoReescritoEntreAsDuasLeituras amarra as duas leituras ao
+// mesmo conteúdo.
+//
+// O `--fix` resolve o Documento para medir e o abre de novo para operar os
+// bytes; os `Local` medidos na primeira são aplicados na segunda. Reescrito
+// entre as duas trocando a ordem dos `elements`, `elements[0]` passa a
+// endereçar outro Retângulo, e a cirurgia alargaria um `w` cujo Rótulo cabia.
+func TestFixRecusaDocumentoReescritoEntreAsDuasLeituras(t *testing.T) {
+	numaPastaTemporariaDe(t, "f11", "largo.yaml")
+	// A ordem invertida é o estrago: o `Local` medido no Rótulo largo passa a
+	// apontar para o Retângulo que já cabia.
+	invertido := `frames:
+  - name: tela
+    w: 400
+    h: 300
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 5, y: 40, w: 90, h: 15}
+            id: outro
+            label: "Ok"
+          - rect: {x: 5, y: 10, w: 20, h: 15}
+            id: bloco
+            label: "Resultados da busca"
+`
+	original := entreAsDuasLeituras
+	entreAsDuasLeituras = func() {
+		if err := os.WriteFile("largo.yaml", []byte(invertido), 0o644); err != nil {
+			t.Fatalf("simulando a reescrita do autor: %v", err)
+		}
+	}
+	t.Cleanup(func() { entreAsDuasLeituras = original })
+
+	codigo, _, stderr := executa("inspect", "--fix", "largo.yaml")
+	if codigo != 1 {
+		t.Errorf("código de saída = %d, queria 1; stderr: %s", codigo, stderr)
+	}
+	if !strings.Contains(stderr, "o arquivo mudou no disco desde a leitura; rode o comando de novo") {
+		t.Errorf("stderr = %q, queria a recusa por mudança no disco", stderr)
+	}
+	depois, err := os.ReadFile("largo.yaml")
+	if err != nil {
+		t.Fatalf("lendo o Documento: %v", err)
+	}
+	if string(depois) != invertido {
+		t.Errorf("o Documento foi mexido depois da reescrita:\n%s", depois)
+	}
+}

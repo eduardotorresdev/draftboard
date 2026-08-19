@@ -218,6 +218,11 @@ que desenhar.
 O `w` sugerido conserta de primeira: ele é arredondado para cima e já devolve o
 respiro de 6 px de cada ponta.
 
+**Limite conhecido**: acima de `--scale` ~20 a rasterização satura a fonte em 256 px
+de dispositivo e pinta um Rótulo menor do que a régua descreve, então o diagnóstico
+pode apontar um corte que naquela escala não acontece. A régua é do Documento, e a
+saturação é guarda de memória do desenho — o Aviso continua valendo para o Documento.
+
 ## Ligações e Prancheta
 
 `to` liga um Elemento a um Frame do mesmo Documento: é o gatilho que leva àquela tela.
