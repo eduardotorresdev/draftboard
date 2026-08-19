@@ -309,6 +309,30 @@ Congelada, com `rotulo=` por último:
 
 `skill_test.go:98` compara essa gramática byte a byte; ela é de F9.
 
+### 13. Emenda: teto de comprimento do `label` do Retângulo
+
+`schema.LimiteDoRotulo = 200`, em **runas**, conferido na decodificação do
+`label` de um `rect`. Erro de decodificação, que aborta como os outros erros de
+decodificação abortam.
+
+Existe porque o texto do Rótulo era a única entrada do módulo sem teto, e o
+rasterizador desenha glifo a glifo mesmo quando a máscara descarta tudo: um
+`label` de 200 000 caracteres com `repeat: {n:20}` cabe em 195 KB de YAML e
+custa 61 s de CPU, produzindo uma imagem onde nada aparece. Com 1 MB e `n:1000`,
+projeta 15 horas. `LimiteDeClones`, `LimiteDeElementos`, `LimiteDeProfundidade` e
+`limiteDaFonte` existem todos para fechar essa mesma amplificação.
+
+200 é o mesmo número de `notes.LimiteDaNota`, contado do mesmo jeito, e pela
+mesma razão: são as duas entradas de texto do autor, e o limite tem que ser
+sabido enquanto se escreve. Um Rótulo é nome de bloco — 200 runas já é folgado.
+
+Diferente do teto da Nota, este **é conferido e recusa**: nomear um bloco com 200
+runas não é problema que a máquina conserte, e a decodificação é onde os erros
+que exigem julgamento do autor já moram. Não confundir com o diagnóstico de
+transbordo de F11, que é sobre caber na caixa, não sobre o tamanho da entrada.
+
+A seção do Rótulo na SKILL.md cita o teto por valor.
+
 ### 12. Vocabulário: `scene.Texto` × o `_Avoid_` do Rótulo
 
 "texto" é `_Avoid_` explícito de **Rótulo** no `CONTEXT.md`, e `scene.Texto` é o
