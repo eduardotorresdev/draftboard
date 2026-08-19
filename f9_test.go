@@ -417,6 +417,47 @@ func coordenada(v float64) string {
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
+// TestRespiroHorizontalDoRotuloEGeometria escreve os dois literais do respiro.
+// Sem eles, o Rótulo nasce colado na borda do bloco e nenhum teste reclama: o
+// recorte da Prancheta é montado a partir do próprio X do Rótulo, e portanto
+// concorda com qualquer valor.
+func TestRespiroHorizontalDoRotuloEGeometria(t *testing.T) {
+	doc := resolveDeF9(t, "rotulos.yaml")
+
+	retangulo := porCaminho(t, doc, "regiao")
+	rotulo := porCaminho(t, doc, "regiao/rotulo")
+
+	if rotulo.X != retangulo.X+6 {
+		t.Errorf("X do Rótulo = %v, quer %v (6 px de respiro)", rotulo.X, retangulo.X+6)
+	}
+	if rotulo.L != retangulo.L-12 {
+		t.Errorf("largura do Rótulo = %v, quer %v (6 px em cada ponta)", rotulo.L, retangulo.L-12)
+	}
+	if rotulo.X != 6 || rotulo.L != 188 {
+		t.Errorf("caixa horizontal do Rótulo = %v..%v, quer 6..188 no bloco de 0,0 200x400",
+			rotulo.X, rotulo.X+rotulo.L)
+	}
+}
+
+// TestRotuloDeControleMantemAGeometriaDoCatalogo protege a exclusão do Rótulo de
+// Controle da passagem de posição. Sem ela, todo Controle rotulado sai com outra
+// caixa e outra fonte — a do bloco, não a que o catálogo desenhou.
+func TestRotuloDeControleMantemAGeometriaDoCatalogo(t *testing.T) {
+	doc := resolveDeF9(t, "controle-com-label.yaml")
+
+	rotulo := porCaminho(t, doc, "e0/rotulo")
+	if rotulo.Controle != "button" {
+		t.Fatalf("a fixture mudou: Controle = %q, queria button", rotulo.Controle)
+	}
+	if rotulo.X != 26.4 || rotulo.Y != 14 || rotulo.L != 67.2 || rotulo.A != 12 {
+		t.Errorf("caixa do Rótulo do Controle = %v,%v %vx%v, quer 26.4,14 67.2x12 (a do catálogo)",
+			rotulo.X, rotulo.Y, rotulo.L, rotulo.A)
+	}
+	if rotulo.Alinhamento != scene.AoCentro {
+		t.Errorf("Alinhamento = %v, quer AoCentro: quem alinha o Rótulo do Controle é o catálogo", rotulo.Alinhamento)
+	}
+}
+
 // TestCaminhoDoRotuloUsaOCaminhoDesambiguadoDoDono protege o pareamento
 // Rótulo↔dono por prefixo, de que vivem o painel da Prancheta e o diagnóstico.
 // Montado sobre o caminho bruto, o Rótulo do segundo bloco ficaria pendurado no
@@ -436,6 +477,45 @@ func TestCaminhoDoRotuloUsaOCaminhoDesambiguadoDoDono(t *testing.T) {
 	if segundo.Y < dono.Y || segundo.Y > dono.Y+dono.A {
 		t.Errorf("o Rótulo em Y=%v não está dentro do Retângulo %q (%v..%v): ele pendurou no bloco errado",
 			segundo.Y, dono.Caminho, dono.Y, dono.Y+dono.A)
+	}
+}
+
+// TestCampoSoDeControleEmRetangulo cobre a lista de campos exclusivos do
+// Controle. Ela ficou sem teste quando o caso que a cobria de carona saiu, e sem
+// ela um `rect` com `items:` passa em silêncio, com o campo ignorado.
+func TestCampoSoDeControleEmRetangulo(t *testing.T) {
+	naPastaDeRotulos(t)
+
+	codigo, saida, erros := executa("validate", "so-items.yaml")
+	if codigo != 1 {
+		t.Fatalf("código de saída = %d, queria 1", codigo)
+	}
+	if saida != "" {
+		t.Errorf("stdout = %q, queria vazio", saida)
+	}
+	esperado := "erro: so-items.yaml: frames[0].layers[0].elements[0]: " +
+		`campo "items" só é permitido em Controle` + "\n"
+	if erros != esperado {
+		t.Errorf("stderr = %q, quer %q", erros, esperado)
+	}
+}
+
+// TestLocalAtravessaAcadeiaDeComponentes escreve os literais que o diagnóstico
+// vai consumir. Local não vazio não basta: um Local sem o prefixo da cadeia
+// aponta um nó do Documento com o índice de dentro do Componente, e quem
+// editasse o arquivo por ele mexeria em outro Retângulo.
+func TestLocalAtravessaAcadeiaDeComponentes(t *testing.T) {
+	doc := resolveDeF9(t, "locais.yaml")
+
+	casos := []struct{ caminho, local string }{
+		{"e0/e0", "frames[0].layers[0].elements[0] -> ./caixa.yaml: elements[0]"},
+		{"e0/corpo/e0", "frames[0].layers[0].elements[0] -> ./caixa.yaml: elements[1].default[0]"},
+		{"e1/corpo/e0", "frames[0].layers[0].elements[1].slots.corpo.elements[0]"},
+	}
+	for _, caso := range casos {
+		if local := porCaminho(t, doc, caso.caminho).Local; local != caso.local {
+			t.Errorf("Local de %q = %q, quer %q", caso.caminho, local, caso.local)
+		}
 	}
 }
 
@@ -468,6 +548,29 @@ func TestLabelTemTetoDeComprimento(t *testing.T) {
 			t.Errorf("stderr = %q, quer %q", erros, esperado)
 		}
 	})
+}
+
+// TestPranchetaDescartaOsControlesC0 fecha a divergência entre os dois
+// desenhistas pelo lado do texto. Um `label` com NUL e ESC entra cru no HTML, o
+// arquivo deixa de ser texto válido, o parser troca o NUL por U+FFFD, e a
+// Prancheta mostra um caractere que o WebP desenha como `.notdef`.
+func TestPranchetaDescartaOsControlesC0(t *testing.T) {
+	naPastaDeRotulos(t)
+
+	pasta := t.TempDir()
+	if codigo, _, erros := executa("board", "rotulo-com-controle.yaml", "--out", pasta); codigo != 0 {
+		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
+	}
+	html := string(leArquivo(t, filepath.Join(pasta, "rotulo-com-controle.html")))
+
+	for _, r := range html {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+			t.Fatalf("a Prancheta escreveu o caractere de controle U+%04X", r)
+		}
+	}
+	if !strings.Contains(html, ">antesdepois<") {
+		t.Errorf("o Rótulo não saiu sem os controles; queria o texto >antesdepois<")
+	}
 }
 
 // TestNotaSaiEntreAspasNaArvore fecha a assimetria com o Rótulo. Uma Nota com

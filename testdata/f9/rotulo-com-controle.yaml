@@ -1,0 +1,10 @@
+frames:
+  - name: t
+    w: 100
+    h: 100
+    layers:
+      - name: c
+        elements:
+          - rect: {x: 10, y: 10, w: 60, h: 30}
+            id: bloco
+            label: "an\0tes\x1bdepois"

@@ -6,6 +6,7 @@ import (
 	"html"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/eduardotorresdev/draftboard/internal/render"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
@@ -210,6 +211,24 @@ func finito(v float64) bool {
 }
 
 // escapa neutraliza o texto vindo do YAML antes de ele entrar no documento.
+//
+// Os caracteres de controle C0 caem fora, antes do escape de marcação: eles não
+// são texto XML válido, e o parser do navegador troca o NUL por U+FFFD. A
+// Prancheta mostraria um caractere que o WebP desenha como `.notdef` — o mesmo
+// Documento com dois desenhos, que é justamente a divergência que o recorte do
+// Rótulo foi fechar. Tabulação, LF e CR ficam: são espaço em branco legítimo.
 func escapa(s string) string {
-	return html.EscapeString(s)
+	return html.EscapeString(strings.Map(semControle, s))
+}
+
+// semControle descarta os caracteres de controle C0 que não são espaço em
+// branco. Devolve -1 para descartar, no protocolo de strings.Map.
+func semControle(r rune) rune {
+	if r < 0x20 && r != '\t' && r != '\n' && r != '\r' {
+		return -1
+	}
+	if r == 0x7f {
+		return -1
+	}
+	return r
 }

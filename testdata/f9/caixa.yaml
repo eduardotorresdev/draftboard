@@ -1,0 +1,6 @@
+elements:
+  - rect: {x: 0, y: 0, w: 100, h: 20}
+  - slot: "corpo"
+    box: {x: 0, y: 30, w: 100, h: 70}
+    default:
+      - rect: {x: 0, y: 0, w: 100, h: 100}
