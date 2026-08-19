@@ -36,10 +36,18 @@ _Avoid_: box, rect, quadrado, caixa
 Elemento redondo definido por um único diâmetro. Nunca vira elipse.
 _Avoid_: bola, ellipse, disco
 
+**Rótulo**:
+Texto desenhado dentro do Elemento que o carrega. Distingue-se da Nota por estar
+no plano do desenho: participa da Elevação e aparece no export por Camada. Não é
+Superfície — nada se apoia sobre ele. Onde ele se apoia dentro do Elemento
+nunca é escolha de quem escreve o Documento.
+_Avoid_: label, caption, legenda, texto, título
+
 **Nota**:
-Anotação textual aninhada no Elemento que ela explica. Não faz parte do desenho:
-não participa da Elevação nem do export por Camada, e some inteira quando
-desligada na renderização.
+Anotação textual aninhada no Elemento que ela explica, desenhada num balão ao
+lado dele. Não faz parte do desenho: não participa da Elevação nem do export por
+Camada, e não aparece a menos que a renderização a peça. Explica o Elemento; não
+o nomeia — nomear é trabalho do Rótulo.
 _Avoid_: label, texto, comentário, callout, balão
 
 ### Geometria e cor
@@ -58,11 +66,6 @@ _Avoid_: profundidade, z, nível, depth
 Valor de cinza atribuído automaticamente a partir da Elevação. Nunca é declarado
 no YAML. A escala vai de 100 (quase branco) a 900 (quase preto), em passos de 100.
 _Avoid_: cor, shade, fill, tonalidade
-
-**Chrome**:
-Superfície ao redor do Frame onde as Notas são posicionadas quando renderizadas
-na margem. Usa o extremo escuro da escala, reservado.
-_Avoid_: margem, gutter, moldura, borda
 
 ### Reuso
 
@@ -92,12 +95,6 @@ cabeça e os parâmetros declarados. Materializa-se em vários Elementos antes d
 Elevação e, como Instância e Repetição, não existe mais no Documento resolvido.
 _Avoid_: widget, componente nativo, primitiva, bloco
 
-**Rótulo**:
-Texto desenhado dentro de um Controle. Distingue-se da Nota por estar no plano
-do desenho: participa da Elevação e aparece no export por Camada. Não é
-Superfície — nada se apoia sobre ele.
-_Avoid_: label, caption, legenda, texto
-
 ### Navegação
 
 **Ligação**:
@@ -112,6 +109,18 @@ Superfície única que dispõe todos os Frames de um Documento com as Ligações
 desenhadas entre eles. A posição de cada Frame é derivada do grafo de Ligações,
 nunca declarada, e a Prancheta não tem dimensão própria.
 _Avoid_: canvas, board, mapa, fluxo, artboard, quadro
+
+### Diagnóstico
+
+**Aviso**:
+Problema que a máquina corrige sozinha, sem julgamento do autor. Não impede o
+desenho nem faz o comando falhar, e carrega o valor que a correção aplicaria.
+_Avoid_: warning, alerta, notice
+
+**Erro**:
+Problema que exige julgamento do autor para ser corrigido. Faz o comando falhar,
+mas só impede o desenho quando a resolução não consegue prosseguir sem ele.
+_Avoid_: falha, exceção, problema
 
 ### Distribuição
 
