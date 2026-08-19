@@ -216,7 +216,7 @@ func TestErrosDeControle(t *testing.T) {
 func TestToggleDizOEstadoPelaPosicao(t *testing.T) {
 	pasta := numaPastaTemporariaDe(t, "f6", "estados.yaml")
 
-	codigo, _, erros := executa("render", "estados.yaml", "--notes", "off")
+	codigo, _, erros := executa("render", "estados.yaml")
 	if codigo != 0 {
 		t.Fatalf("código de saída = %d, queria 0; stderr: %s", codigo, erros)
 	}

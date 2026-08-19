@@ -2,10 +2,10 @@
 // absolutos, com Elevação e Tom já calculados, e produz uma imagem WebP
 // lossless em escala de cinza.
 //
-// A tela é composta por duas regiões: o Frame, pintado com scene.TomFrame, e o
-// Chrome ao redor dele, pintado com scene.TomChrome. Elementos vivem no espaço
+// A tela é composta por duas regiões: o Frame, pintado com scene.TomFrame, e a
+// margem ao redor dele, pintada com scene.TomChrome. Elementos vivem no espaço
 // do Frame e são recortados nele; as primitivas do plano de anotação vivem no
-// espaço da tela inteira e alcançam o Chrome.
+// espaço da tela inteira e alcançam a margem.
 //
 // Este pacote nunca importa internal/notes.
 package render
@@ -54,7 +54,7 @@ type Canvas struct {
 
 	// l e a são as dimensões do Frame em px do espaço do Frame.
 	l, a float64
-	// margens delimitam o Chrome, em px do espaço do Frame.
+	// margens delimitam a faixa ao redor do Frame, em px do espaço do Frame.
 	margemT, margemD, margemB, margemE float64
 
 	// recorte é a máscara do retângulo do Frame. É calculada uma única vez e
@@ -67,8 +67,9 @@ type Canvas struct {
 }
 
 // NewCanvas cria a tela. l e a são as dimensões do Frame em px. As quatro
-// margens são o Chrome em px do espaço do Frame; podem ser 0. escala multiplica
-// tudo. O Chrome é pintado com scene.TomChrome e o Frame com scene.TomFrame.
+// margens são a faixa ao redor do Frame em px do espaço do Frame; podem ser 0.
+// escala multiplica tudo. A margem é pintada com scene.TomChrome e o Frame com
+// scene.TomFrame.
 //
 // As dimensões finais em pixels são o produto arredondado para o inteiro mais
 // próximo, de modo que fatores de escala não-inteiros funcionem.
@@ -97,8 +98,8 @@ func NewCanvas(l, a int, margemT, margemD, margemB, margemE, escala float64) *Ca
 		faces:   make(map[float64]font.Face),
 	}
 
-	// O Chrome cobre a tela inteira e o Frame é pintado por cima dele: a área
-	// das margens fica com TomChrome e a área do Frame com TomFrame.
+	// O Tom reservado cobre a tela inteira e o Frame é pintado por cima
+	// dele: a área das margens fica com TomChrome e a do Frame com TomFrame.
 	c.dc.SetColor(cor(scene.TomChrome))
 	c.dc.Clear()
 
@@ -113,7 +114,7 @@ func NewCanvas(l, a int, margemT, margemD, margemB, margemE, escala float64) *Ca
 // DesenhaElemento pinta um Elemento resolvido, recortado ao Frame. O Elemento
 // é sólido, no Tom que já traz consigo, e é posicionado no espaço do Frame —
 // portanto deslocado pelas margens esquerda e superior. Um Elemento que
-// ultrapassa a borda é cortado e nunca invade o Chrome.
+// ultrapassa a borda é cortado e nunca invade a margem.
 //
 // A bounding box é recortada ao retângulo do Frame ANTES de rasterizar. Além de
 // evitar trabalho invisível, isso é o que impede o laço de CPU sem fim do
@@ -162,7 +163,7 @@ func (c *Canvas) DesenhaElemento(e scene.Elemento) {
 
 // mascaraDaArea devolve a máscara do retângulo dado, já interseccionado com o
 // Frame. É o recorte do Rótulo: texto mais largo que a área que lhe coube é
-// cortado nela, e nunca vaza para a Superfície vizinha nem para o Chrome.
+// cortado nela, e nunca vaza para a Superfície vizinha nem para a margem.
 func (c *Canvas) mascaraDaArea(x, y, l, a float64) *image.Alpha {
 	larg, alt := c.dc.Width(), c.dc.Height()
 	fx0, fy0, fx1, fy1 := c.retanguloDoFrame()
@@ -289,7 +290,7 @@ func preso(v, min, max float64) float64 {
 }
 
 // Retangulo pinta um retângulo sólido no plano de anotação. As coordenadas são
-// relativas ao canto superior esquerdo da tela inteira, Chrome incluso.
+// relativas ao canto superior esquerdo da tela inteira, margens inclusas.
 func (c *Canvas) Retangulo(x, y, l, a float64, t scene.Tom) {
 	if l <= 0 || a <= 0 {
 		return
@@ -300,7 +301,7 @@ func (c *Canvas) Retangulo(x, y, l, a float64, t scene.Tom) {
 }
 
 // Linha traça uma linha reta no plano de anotação. As coordenadas e a espessura
-// são relativas à tela inteira, Chrome incluso.
+// são relativas à tela inteira, margens inclusas.
 func (c *Canvas) Linha(x1, y1, x2, y2, espessura float64, t scene.Tom) {
 	if espessura <= 0 {
 		return

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/eduardotorresdev/draftboard/internal/notes"
 )
 
 // opcoes são as opções de `render` já interpretadas.
@@ -17,8 +15,9 @@ type opcoes struct {
 	saida string
 	// escala multiplica as dimensões declaradas do Frame.
 	escala float64
-	// notas é o modo de exibição das Notas.
-	notas notes.Modo
+	// notas liga o desenho das Notas. Desligado por padrão: a imagem sai
+	// limpa e a anotação é pedida quando se quer.
+	notas bool
 	// camadas liga o export por Camada, cumulativo.
 	camadas bool
 }
@@ -26,7 +25,7 @@ type opcoes struct {
 // interpretaRender lê as opções de `render`. O arquivo do Documento pode vir
 // antes ou depois das opções.
 func interpretaRender(args []string) (opcoes, error) {
-	o := opcoes{saida: ".", escala: 1, notas: notes.Margem}
+	o := opcoes{saida: ".", escala: 1}
 	var posicionais []string
 	args = expandeIguais(args)
 	for i := 0; i < len(args); i++ {
@@ -56,20 +55,17 @@ func interpretaRender(args []string) (opcoes, error) {
 			}
 			o.escala = f
 		case "--notes", "-notes":
-			v, err := valorDe(args, &i, a)
-			if err != nil {
-				return o, err
+			// A opção não tem mais valor, mas quem já escreveu `--notes
+			// off` merece saber o que mudou em vez de ver o comando
+			// reclamar de um argumento em excesso. Só os três nomes
+			// aposentados são consumidos: expandeIguais já transformou
+			// `--notes=off` em dois argumentos, e qualquer outra coisa
+			// ali é o caminho do Documento ou a próxima opção.
+			if i+1 < len(args) && modoAposentado(args[i+1]) {
+				i++
+				return o, errors.New(erroDeModoDeNota)
 			}
-			switch v {
-			case "margin":
-				o.notas = notes.Margem
-			case "float":
-				o.notas = notes.Flutuante
-			case "off":
-				o.notas = notes.Desligado
-			default:
-				return o, fmt.Errorf("opção %q espera margin, float ou off, encontrou %q", a, v)
-			}
+			o.notas = true
 		case "--layers", "-layers":
 			o.camadas = true
 		default:
@@ -82,6 +78,17 @@ func interpretaRender(args []string) (opcoes, error) {
 	}
 	o.arquivo = arquivo
 	return o, nil
+}
+
+// erroDeModoDeNota é a mensagem de migração dos modos de Nota aposentados. Diz
+// as duas saídas — com balões e sem Notas — porque o padrão mudou junto: quem
+// passava `--notes off` já está no padrão novo e não precisa de opção nenhuma.
+const erroDeModoDeNota = `opção "--notes" não aceita mais valor: os modos margin, float e off acabaram; use "--notes" sozinho para os balões flutuantes, ou omita a opção para renderizar sem Notas`
+
+// modoAposentado reporta se o argumento é um dos três modos que `--notes`
+// aceitava.
+func modoAposentado(a string) bool {
+	return a == "margin" || a == "float" || a == "off"
 }
 
 // opcoesBoard são as opções do verbo `board`. A Prancheta não tem escala nem

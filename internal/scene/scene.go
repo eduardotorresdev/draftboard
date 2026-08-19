@@ -13,8 +13,9 @@ type Tom int
 const (
 	// TomFrame é o Tom fixo do fundo de todo Frame.
 	TomFrame Tom = 100
-	// TomChrome é o extremo escuro reservado ao Chrome. A escada de Elevação
-	// nunca o alcança.
+	// TomChrome é o extremo escuro reservado ao plano de anotação: é o Tom
+	// do balão da Nota. A escada de Elevação nunca o alcança, então nenhum
+	// Elemento pode ser confundido com uma anotação.
 	TomChrome Tom = 900
 	// tomMax é o Tom mais escuro que a escada de Elevação pode atingir.
 	tomMax Tom = 800

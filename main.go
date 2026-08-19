@@ -52,7 +52,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 func imprimeUso(w io.Writer) {
 	fmt.Fprint(w, `uso:
-  draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes margin|float|off] [--layers]
+  draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes] [--layers]
   draftboard board    <arquivo.yaml> [--out DIR]
   draftboard inspect  <arquivo.yaml>
   draftboard validate <arquivo.yaml>

@@ -55,7 +55,7 @@ func comandoRender(args []string, stdout, stderr io.Writer) int {
 func escreveFrame(o opcoes, documento string, indice int, f scene.Frame) ([]string, error) {
 	var caminhos []string
 	// As Notas não aparecem no export por Camada, então ele também não
-	// reserva Chrome ao redor do Frame.
+	// planeja anotação nenhuma.
 	if o.camadas {
 		if err := cabeNaTela(o, indice, f, 0, 0, 0, 0); err != nil {
 			return nil, err
@@ -71,9 +71,14 @@ func escreveFrame(o opcoes, documento string, indice int, f scene.Frame) ([]stri
 		}
 		return caminhos, nil
 	}
-	// O Chrome entra na conta do teto de área, então o teste vem depois de
-	// planejar as Notas, com as margens que serão realmente usadas.
-	plano := notes.Planeja(f, o.notas, o.escala)
+	// As margens do plano de anotação entram na conta do teto de área, então
+	// o teste vem depois de planejar as Notas, com as margens que serão
+	// realmente usadas. Sem `--notes` não há plano: o *Plano nulo atravessa
+	// os dois métodos abaixo sem desenhar nem pedir margem.
+	var plano *notes.Plano
+	if o.notas {
+		plano = notes.Planeja(f, o.escala)
+	}
 	t, d, b, e := plano.Margens()
 	if err := cabeNaTela(o, indice, f, t, d, b, e); err != nil {
 		return nil, err
@@ -89,7 +94,7 @@ func escreveFrame(o opcoes, documento string, indice int, f scene.Frame) ([]stri
 }
 
 // cabeNaTela recusa, antes de qualquer alocação, o Frame cuja tela de saída
-// passaria de render.LimiteDeArea. A área é a do Frame mais o Chrome, com o
+// passaria de render.LimiteDeArea. A área é a do Frame mais as margens, com o
 // fator de escala aplicado nos dois eixos.
 func cabeNaTela(o opcoes, indice int, f scene.Frame, margemT, margemD, margemB, margemE float64) error {
 	largura := margemE + float64(f.L) + margemD
