@@ -178,13 +178,13 @@ func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminh
 		x, y, l, a := esp.retangulo(c)
 		// O Rótulo pendura no caminho que o Retângulo de fato recebeu, e não
 		// no valor bruto: caminhoUnico pode ter sufixado o do dono.
-		emitido := r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
-		return r.rotuloDoRetangulo(no, emitido, ctx, dest, x, y, l, a)
+		emitido := r.acrescenta(dest, no, caminho, ctx, esp, scene.Retangulo, x, y, l, a)
+		return r.rotuloDoRetangulo(no, emitido, ctx, esp, dest, x, y, l, a)
 	case schema.TipoCirculo:
 		d := *no.Circulo
 		d.X, d.Y = d.X+dx, d.Y+dy
 		x, y, l, a := esp.circulo(d)
-		r.acrescenta(dest, no, caminho, ctx, scene.Circulo, x, y, l, a)
+		r.acrescenta(dest, no, caminho, ctx, esp, scene.Circulo, x, y, l, a)
 		return nil
 	case schema.TipoSlot:
 		return r.slot(no, esp, desloca(*no.Caixa, dx, dy), caminho, ctx, dest)
@@ -263,7 +263,7 @@ func (r *resolucao) slot(no schema.No, esp espaco, caixa schema.Caixa, caminho s
 	r.aviso(ctx.prefixo+no.Local, fmt.Sprintf(
 		"Slot %q%s sem preenchimento e sem conteúdo padrão: renderiza uma Superfície vazia",
 		no.Slot, declaradoEm(ctx)))
-	r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+	r.acrescenta(dest, no, caminho, ctx, esp, scene.Retangulo, x, y, l, a)
 	return nil
 }
 
@@ -362,7 +362,7 @@ func (r *resolucao) reposiciona(err error, local, referencia string) error {
 // Devolve o caminho que o Elemento de fato recebeu, já desambiguado: quem
 // pendura uma peça no caminho do Elemento tem que pendurá-la nesse valor, e não
 // no valor bruto que entrou aqui.
-func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) string {
+func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, esp espaco, forma scene.Forma, x, y, l, a float64) string {
 	local := ctx.prefixo + no.Local
 	if x < 0 || y < 0 || x+l > r.frameL || y+a > r.frameA {
 		r.aviso(local, "Elemento fora do Frame: será recortado na borda")
@@ -370,7 +370,7 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 	if l <= 0 || a <= 0 {
 		r.aviso(local, "Elemento de área zero: não aparecerá no desenho")
 	}
-	return r.emite(dest, scene.Elemento{
+	return r.emite(dest, esp, scene.Elemento{
 		Caminho:     caminho,
 		ID:          no.ID,
 		Forma:       forma,
@@ -396,8 +396,11 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 // segundo tem que pendurar em `bloco~2/rotulo`. Montado sobre o valor bruto, ele
 // ficaria pendurado no caminho do primeiro, e quem pareia Rótulo↔dono por
 // prefixo atribuiria o texto ao Retângulo errado.
-func (r *resolucao) emite(dest *[]scene.Elemento, e scene.Elemento) string {
+func (r *resolucao) emite(dest *[]scene.Elemento, esp espaco, e scene.Elemento) string {
 	e.Caminho = r.caminhoUnico(e.Caminho)
+	// O espaço vem de quem projetou, e não da geometria já projetada: só ele
+	// sabe contra que base as porcentagens do nó foram medidas.
+	e.Espaco = scene.Espaco(esp)
 	*dest = append(*dest, e)
 	return e.Caminho
 }
@@ -522,7 +525,7 @@ func (r *resolucao) controle(no schema.No, esp espaco, caixa schema.Caixa, camin
 		if e.L <= 0 || e.A <= 0 {
 			r.aviso(local, "Elemento de área zero: não aparecerá no desenho")
 		}
-		r.emite(dest, e)
+		r.emite(dest, esp, e)
 	}
 	return nil
 }

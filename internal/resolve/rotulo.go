@@ -23,11 +23,15 @@ const alturaDoRotulo = 28.0
 // afastamento, e o mesmo Documento sairia diferente nos dois.
 const respiroDoRotulo = 6.0
 
-// segmentoDoRotulo é o segmento fixo que o Rótulo acrescenta ao caminho do
+// SegmentoDoRotulo é o segmento fixo que o Rótulo acrescenta ao caminho do
 // Retângulo. Fixo de propósito: sem ele, caminhoUnico desambiguaria o Rótulo
 // com um sufixo ~2 e o painel de inspeção da Prancheta mostraria um Elemento
 // fantasma ao lado do Retângulo que o carrega.
-const segmentoDoRotulo = "rotulo"
+//
+// É exportado para que o diagnóstico ache o Retângulo dono pelo Caminho sem
+// escrever uma segunda grafia do sufixo: duas grafias que divergissem fariam o
+// diagnóstico medir o Rótulo contra a largura errada.
+const SegmentoDoRotulo = "rotulo"
 
 // rotuloDoRetangulo materializa o Rótulo declarado num nó `rect`, logo depois
 // do Retângulo que o carrega e na mesma Camada.
@@ -45,7 +49,7 @@ const segmentoDoRotulo = "rotulo"
 //
 // A invariante vale só até atribuiElevacao: depois dela, sobeRotulos leva cada
 // Rótulo para o fim da Camada, para que os filhos não o apaguem da imagem.
-func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto, dest *[]scene.Elemento, x, y, l, a float64) error {
+func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto, esp espaco, dest *[]scene.Elemento, x, y, l, a float64) error {
 	if no.Rotulo == "" {
 		return nil
 	}
@@ -59,8 +63,10 @@ func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto
 	// Sem aviso geométrico próprio: a geometria do Rótulo é derivada, o autor
 	// não a declarou, e um segundo aviso no mesmo Local não teria como ser
 	// lido como coisa diferente do aviso do Retângulo.
-	r.emite(dest, scene.Elemento{
-		Caminho: caminhoDaPeca(caminho, segmentoDoRotulo),
+	// O espaço é o do Retângulo que carrega o Rótulo: quem sugere um `w` maior
+	// tem que desfazer a projeção contra a mesma base que o dono usou.
+	r.emite(dest, esp, scene.Elemento{
+		Caminho: caminhoDaPeca(caminho, SegmentoDoRotulo),
 		Forma:   scene.Texto,
 		X:       x,
 		Y:       y,

@@ -1,0 +1,14 @@
+frames:
+  - name: tela
+    w: 400
+    h: 200
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 50, h: 50}
+            id: bloco
+            label: "Grade"
+          - circle: {x: 60, y: 10, d: 10}
+            id: ponto
+          - use: ./peca.yaml
+            box: {x: 10, y: 10, w: 50, h: 50}
