@@ -183,14 +183,45 @@ sozinho. Não existe chave para forçar nem para desligar.
   Retângulo quando ele é mais baixo, e recua 6 px de cada lado. A altura é fixa, e não
   uma fração do bloco: um bloco de 400 px de altura teria um Rótulo de mockup.
 - Cabe cerca de 28 px de altura de texto, e só uma linha: o Rótulo **não quebra**.
-  Texto que não cabe é recortado na área dele. Um Rótulo que estoura o bloco no
-  wireframe vai estourar o componente na UI.
+  Rótulo que não cabe é **cortado, nunca quebrado** — e o corte é diagnosticado, veja
+  abaixo. Um Rótulo que estoura o bloco no wireframe vai estourar o componente na UI.
 - O tamanho da fonte é derivado da altura da caixa, como no Controle — sem campo de
   fonte, de alinhamento nem de cor.
 - O texto do Rótulo tem teto de **200 runas**: acima disso a decodificação recusa o
   Documento. É o mesmo teto da Nota, e pela mesma razão — Rótulo é nome de bloco.
 - No `inspect`, o Rótulo aparece como sufixo `rotulo="..."` na linha do próprio
   Retângulo; o texto não vira uma linha a mais na árvore.
+
+## Diagnóstico
+
+Rótulo cortado e Nota comprida são diagnosticados nos quatro verbos — `render`,
+`board`, `inspect` e `validate` —, sempre sobre o Documento e nunca sobre a
+invocação: o diagnóstico não muda com `--scale` nem com `--notes`.
+
+A categoria vem da **corrigibilidade**, não da gravidade: o que a máquina
+conserta sozinha é Aviso, o que exige julgamento do autor é Erro.
+
+| Categoria | Quando | O que se espera do autor |
+| --- | --- | --- |
+| **Aviso** | o Rótulo não cabe num Retângulo escrito direto no Documento, com `w` declarado como número solto e fora de Repetição | aplicar o `w` sugerido, ou deixar `inspect --fix` aplicá-lo |
+| **Erro** | o Retângulo vem de um Componente | alargá-lo lá muda **todas** as Instâncias: decida onde |
+| **Erro** | o Retângulo não declara `w` | escrever um `w` é escolher a largura, e essa escolha é sua |
+| **Erro** | o Retângulo está dentro de uma Repetição | o `w` é o passo da Repetição: alargá-lo reposiciona os clones |
+| **Erro** | o espaço do Retângulo tem largura zero | a porcentagem não tem base; conserte a caixa que abriu o espaço |
+| **Erro** | a Nota passa de 200 runas | não há largura a alargar: encurte a Nota |
+
+O Erro de diagnóstico **não aborta**: a imagem, a Prancheta e a árvore saem do
+mesmo jeito, e só o código de saída vira `1`. Ele descreve um desenho que já
+existe e está errado — diferente do erro de decodificação, que impede de saber o
+que desenhar.
+
+O `w` sugerido conserta de primeira: ele é arredondado para cima e já devolve o
+respiro de 6 px de cada ponta.
+
+**Limite conhecido**: acima de `--scale` ~20 a rasterização satura a fonte em 256 px
+de dispositivo e pinta um Rótulo menor do que a régua descreve, então o diagnóstico
+pode apontar um corte que naquela escala não acontece. A régua é do Documento, e a
+saturação é guarda de memória do desenho — o Aviso continua valendo para o Documento.
 
 ## Ligações e Prancheta
 
@@ -287,7 +318,7 @@ Consequência prática: para dar contraste a um Elemento, **aninhe-o** dentro de
 ```
 draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes] [--layers]
 draftboard board    <arquivo.yaml> [--out DIR]
-draftboard inspect  <arquivo.yaml>
+draftboard inspect  <arquivo.yaml> [--fix]
 draftboard validate <arquivo.yaml>
 draftboard skill    [--install [DIR]] [--sync [DIR]] [--yes] [--no]
 draftboard version
@@ -300,6 +331,7 @@ draftboard update   [--check] [--yes] [--no]
 | `--scale N` | `render` | `1` | multiplicador float > 0 de toda a imagem |
 | `--notes` | `render` | desligado | desenha as Notas em balões sobre o Frame; sem ela a imagem sai sem Nota nenhuma |
 | `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |
+| `--fix` | `inspect` | desligado | reescreve no arquivo o `w` de cada Retângulo cujo Rótulo não cabe, e imprime a árvore já corrigida |
 | `--install [DIR]` | `skill` | `~/.claude/skills` | grava a skill em `<DIR>/draftboard/SKILL.md` |
 | `--sync [DIR]` | `skill` | `~/.claude/skills` | regrava a skill só se o conteúdo mudou, perguntando antes |
 | `--check` | `update` | desligado | só reporta se há versão nova; não escreve nada |
@@ -308,7 +340,8 @@ draftboard update   [--check] [--yes] [--no]
 
 - `render` imprime no stdout **apenas os caminhos escritos**, um por linha, na ordem de geração.
 - `board` escreve **um** arquivo, a Prancheta do Documento inteiro, e imprime só o caminho dele no stdout. Não aceita `--scale` nem `--notes`: a Prancheta é vetorial e mostra a Nota na inspeção.
-- `inspect` imprime a árvore no stdout e **não escreve nada em disco**.
+- `inspect` imprime a árvore no stdout e **não escreve nada em disco** — a menos que `--fix` peça o conserto.
+- `inspect --fix` reescreve o `w` no Documento, imprime uma linha de troca por conserto no stderr (`frames[0].layers[0].elements[2]: w 20 → 47`) e imprime no stdout a árvore **já corrigida**. Sem nada a consertar, não toca no arquivo.
 - `validate` não imprime nada no stdout quando passa.
 - `skill` sem `--install` imprime a skill no stdout.
 - `version` imprime versão, commit e data do build no stdout.
@@ -316,7 +349,7 @@ draftboard update   [--check] [--yes] [--no]
 - `update --check` só reporta se há versão nova e **não escreve nada**.
 - `skill --sync` regrava a skill só quando ela mudou, e não grava nada quando a entrada não é um terminal.
 - Avisos vão para stderr com prefixo `aviso: `; erros vão para stderr com prefixo `erro: `.
-- Sucesso sai com código `0`; erro sai com `1`.
+- Sucesso sai com código `0`; erro sai com `1`. O Erro de diagnóstico é a exceção que confirma a regra: ele não aborta o comando — a imagem, a árvore e a Prancheta saem assim mesmo — e só muda o código para `1`.
 
 ### Nomes dos arquivos de saída
 

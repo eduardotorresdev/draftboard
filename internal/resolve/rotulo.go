@@ -15,19 +15,29 @@ import (
 // fonte de 180 px, que é mockup, não wireframe.
 const alturaDoRotulo = 28.0
 
-// respiroDoRotulo é a folga em cada ponta horizontal, em px do espaço do Frame,
+// RespiroDoRotulo é a folga em cada ponta horizontal, em px do espaço do Frame,
 // entre a borda do Retângulo e a área do Rótulo.
 //
 // É geometria, e é entregue já descontada da área do Elemento de Texto: se
 // morasse no desenhista, a Prancheta e o WebP teriam cada um a sua regra de
 // afastamento, e o mesmo Documento sairia diferente nos dois.
-const respiroDoRotulo = 6.0
+//
+// É exportada porque quem sugere um `w` maior precisa devolver o respiro POR
+// VALOR: a diferença observada entre a largura do Retângulo e a da área do
+// Rótulo só vale o dobro do respiro enquanto o Retângulo for mais largo que
+// ele. Num Retângulo de 2 px a área satura em zero, a diferença vale 2, e um
+// `w` calculado por diferença sai curto e não conserta de primeira.
+const RespiroDoRotulo = 6.0
 
-// segmentoDoRotulo é o segmento fixo que o Rótulo acrescenta ao caminho do
+// SegmentoDoRotulo é o segmento fixo que o Rótulo acrescenta ao caminho do
 // Retângulo. Fixo de propósito: sem ele, caminhoUnico desambiguaria o Rótulo
 // com um sufixo ~2 e o painel de inspeção da Prancheta mostraria um Elemento
 // fantasma ao lado do Retângulo que o carrega.
-const segmentoDoRotulo = "rotulo"
+//
+// É exportado para que o diagnóstico ache o Retângulo dono pelo Caminho sem
+// escrever uma segunda grafia do sufixo: duas grafias que divergissem fariam o
+// diagnóstico medir o Rótulo contra a largura errada.
+const SegmentoDoRotulo = "rotulo"
 
 // rotuloDoRetangulo materializa o Rótulo declarado num nó `rect`, logo depois
 // do Retângulo que o carrega e na mesma Camada.
@@ -45,7 +55,7 @@ const segmentoDoRotulo = "rotulo"
 //
 // A invariante vale só até atribuiElevacao: depois dela, sobeRotulos leva cada
 // Rótulo para o fim da Camada, para que os filhos não o apaguem da imagem.
-func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto, dest *[]scene.Elemento, x, y, l, a float64) error {
+func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto, esp espaco, dest *[]scene.Elemento, x, y, l, a float64) error {
 	if no.Rotulo == "" {
 		return nil
 	}
@@ -59,8 +69,10 @@ func (r *resolucao) rotuloDoRetangulo(no schema.No, caminho string, ctx contexto
 	// Sem aviso geométrico próprio: a geometria do Rótulo é derivada, o autor
 	// não a declarou, e um segundo aviso no mesmo Local não teria como ser
 	// lido como coisa diferente do aviso do Retângulo.
-	r.emite(dest, scene.Elemento{
-		Caminho: caminhoDaPeca(caminho, segmentoDoRotulo),
+	// O espaço é o do Retângulo que carrega o Rótulo: quem sugere um `w` maior
+	// tem que desfazer a projeção contra a mesma base que o dono usou.
+	r.emite(dest, esp, scene.Elemento{
+		Caminho: caminhoDaPeca(caminho, SegmentoDoRotulo),
 		Forma:   scene.Texto,
 		X:       x,
 		Y:       y,
@@ -149,8 +161,8 @@ func posiciona(rotulo, retangulo *scene.Elemento, todos []*scene.Elemento) {
 	// de 10 px transbordaria por baixo dele e apagaria o vizinho.
 	a := math.Min(alturaDoRotulo, retangulo.A)
 
-	rotulo.X = retangulo.X + respiroDoRotulo
-	rotulo.L = math.Max(0, retangulo.L-2*respiroDoRotulo)
+	rotulo.X = retangulo.X + RespiroDoRotulo
+	rotulo.L = math.Max(0, retangulo.L-2*RespiroDoRotulo)
 	rotulo.A = a
 	if temFilho(retangulo, todos) {
 		rotulo.Y = retangulo.Y

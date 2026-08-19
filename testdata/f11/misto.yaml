@@ -1,0 +1,29 @@
+frames:
+  - name: tela
+    w: 400
+    h: 300
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 5, y: 5, w: 20, h: 10}
+            id: bloco0
+            label: "Resultados da busca"
+          - rect: {x: 5, y: 20, w: 20, h: 10}
+            id: bloco1
+            label: "Resultados da busca"
+          - rect: {x: 5, y: 35, w: 20, h: 10}
+            id: bloco2
+            label: "Resultados da busca"
+          - rect: {x: 5, y: 50, w: 20, h: 10}
+            id: bloco3
+            label: "Resultados da busca"
+          - rect: {x: 5, y: 65, w: 20, h: 10}
+            id: bloco4
+            label: "Resultados da busca"
+          - rect: {x: 5, y: 85, h: 10}
+            id: sem-largura
+            label: "Resultados da busca"
+          - rect: {x: 60, y: 5, w: 20, h: 10}
+            id: repetido
+            label: "Resultados da busca"
+            repeat: {n: 3, axis: y, gap: 2}

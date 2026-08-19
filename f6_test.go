@@ -44,7 +44,7 @@ func TestControleImprimeUmaLinhaPorNo(t *testing.T) {
 
 // TestControleAnotaUmaVezSo protege o plano de anotação: a Nota fica na cabeça
 // do Controle, e as peças internas não a repetem. Se um dia uma peça herdar a
-// Nota, o mesmo Controle será anotado várias vezes na margem.
+// Nota, o mesmo Controle será anotado várias vezes no plano de anotação.
 func TestControleAnotaUmaVezSo(t *testing.T) {
 	naPastaDeControles(t)
 

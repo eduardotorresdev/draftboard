@@ -119,6 +119,16 @@ const (
 	AEsquerda
 )
 
+// Espaco é a caixa, em px do Frame, do espaço local em que as porcentagens do
+// nó foram projetadas: o Frame inteiro para um nó escrito no Documento, e a
+// caixa que recebe a Instância ou o Slot para um nó vindo de Componente.
+//
+// É a caixa inteira, e não só a largura, porque o eixo vertical projeta por A e
+// o Círculo projeta o diâmetro por L nos dois eixos. Existe porque desfazer a
+// projeção é a única forma de dizer ao autor qual porcentagem ele teria que
+// escrever, e só quem projetou conhece a base.
+type Espaco struct{ X, Y, L, A float64 }
+
 // Elemento é uma forma posicionada num Frame, com geometria já resolvida em
 // pixels absolutos relativos ao canto superior esquerdo do Frame.
 type Elemento struct {
@@ -185,6 +195,9 @@ type Elemento struct {
 	// Alinhamento posiciona o Rotulo dentro da área do Elemento. Só tem efeito
 	// quando Forma é Texto.
 	Alinhamento Alinhamento
+	// Espaco é o espaço local em que as porcentagens do nó foram projetadas.
+	// Preenchido em todo Elemento; o Rótulo herda o do Retângulo que o carrega.
+	Espaco Espaco
 }
 
 // Camada é um grupo nomeado e ordenado de Elementos dentro de um Frame.

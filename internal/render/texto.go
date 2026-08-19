@@ -1,6 +1,7 @@
 package render
 
 import (
+	"math"
 	"strings"
 	"sync"
 
@@ -31,7 +32,7 @@ func fonteBase() *truetype.Font {
 }
 
 // Texto escreve uma linha de texto no plano de anotação. As coordenadas são
-// relativas ao canto superior esquerdo da tela inteira, Chrome incluso, e y é o
+// relativas ao canto superior esquerdo da tela inteira, e não ao Frame, e y é o
 // TOPO da linha, não a linha de base.
 func (c *Canvas) Texto(x, y float64, s string, tamanho float64, t scene.Tom) {
 	if s == "" {
@@ -51,7 +52,7 @@ func (c *Canvas) Texto(x, y float64, s string, tamanho float64, t scene.Tom) {
 func (c *Canvas) MedeTexto(s string, tamanho float64) (l, a float64) {
 	f := c.face(tamanho)
 	_, altura := metricas(f)
-	return c.paraOFrame(c.larguraDeDispositivo(f, s)), c.paraOFrame(altura)
+	return c.paraOFrame(larguraDeDispositivo(f, s)), c.paraOFrame(altura)
 }
 
 // paraOFrame converte px de dispositivo de volta ao espaço do Frame. Escala
@@ -84,7 +85,7 @@ func (c *Canvas) QuebraTexto(s string, tamanho, larguraMax float64) []string {
 		linha := palavras[0]
 		for _, palavra := range palavras[1:] {
 			candidata := linha + " " + palavra
-			if c.larguraDeDispositivo(f, candidata) <= maxDispositivo {
+			if larguraDeDispositivo(f, candidata) <= maxDispositivo {
 				linha = candidata
 				continue
 			}
@@ -136,8 +137,54 @@ func (c *Canvas) face(tamanho float64) font.Face {
 	return f
 }
 
+// facesDoDiagnostico memoiza as faces SEM hinting da régua do diagnóstico. É do
+// processo, e não de um Canvas, porque a medida do diagnóstico não depende da
+// escala: guardá-la por Canvas repetiria a mesma face a cada tela criada, e não
+// guardá-la construiria um cache de 512 glifos por Rótulo medido.
+var (
+	facesDoDiagnosticoMu sync.Mutex
+	facesDoDiagnostico   = map[float64]font.Face{}
+)
+
+// LarguraDoDiagnostico devolve a largura de uma linha de texto, em px do mesmo
+// espaço em que o tamanho foi pedido, medida SEM hinting.
+//
+// É a régua do DIAGNÓSTICO, e não a da pintura. HintingFull arredonda o avanço
+// de cada glifo para o pixel de dispositivo: a 12,6 px — o maior corpo que um
+// Rótulo de Retângulo alcança — vinte `l` medem 60 px com hinting e 67,5 sem
+// ele, e é 67,5 que a rasterização em escala maior de fato pinta. Medindo com
+// hinting, o `--fix` declara consertado um Rótulo que a imagem continua
+// cortando. O avanço sem hinting é o ideal da fonte, que não depende da escala
+// e erra menos de 0,1 px contra qualquer uma delas.
+//
+// Quem pinta continua com HintingFull, que é o que dá traço nítido em corpo
+// pequeno. O teto de limiteDaFonte vale aqui pela mesma razão de memória, e
+// está escrito na SKILL.md como limite conhecido do diagnóstico.
+func LarguraDoDiagnostico(s string, tamanho float64) float64 {
+	if s == "" || !finito(tamanho) || tamanho <= 0 {
+		return 0
+	}
+	corpo := math.Min(tamanho, limiteDaFonte)
+	return larguraDeDispositivo(faceDoDiagnostico(corpo), s) * tamanho / corpo
+}
+
+func faceDoDiagnostico(corpo float64) font.Face {
+	facesDoDiagnosticoMu.Lock()
+	defer facesDoDiagnosticoMu.Unlock()
+	if f, ok := facesDoDiagnostico[corpo]; ok {
+		return f
+	}
+	f := truetype.NewFace(fonteBase(), &truetype.Options{
+		Size:    corpo,
+		DPI:     72,
+		Hinting: font.HintingNone,
+	})
+	facesDoDiagnostico[corpo] = f
+	return f
+}
+
 // larguraDeDispositivo mede o avanço de uma linha em px de dispositivo.
-func (c *Canvas) larguraDeDispositivo(f font.Face, s string) float64 {
+func larguraDeDispositivo(f font.Face, s string) float64 {
 	d := &font.Drawer{Face: f}
 	return float64(d.MeasureString(s)) / 64
 }
@@ -187,7 +234,7 @@ func (c *Canvas) desenhaRotulo(e scene.Elemento, x, y, l, a float64) {
 	base := y + (a-altura)/2 + subida
 	inicio := x
 	if e.Alinhamento == scene.AoCentro {
-		inicio = x + (l-c.larguraDeDispositivo(f, e.Rotulo))/2
+		inicio = x + (l-larguraDeDispositivo(f, e.Rotulo))/2
 	}
 
 	_ = c.dc.SetMask(c.mascaraDaArea(x, y, l, a))
