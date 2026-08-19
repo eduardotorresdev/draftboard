@@ -71,18 +71,22 @@ func escreveFrame(o opcoes, documento string, indice int, f scene.Frame) ([]stri
 		}
 		return caminhos, nil
 	}
-	// As margens do plano de anotação entram na conta do teto de área, então
-	// o teste vem depois de planejar as Notas, com as margens que serão
-	// realmente usadas. Sem `--notes` não há plano: o *Plano nulo atravessa
-	// os dois métodos abaixo sem desenhar nem pedir margem.
+	// O teto de área vem antes de planejar a anotação. As margens do plano
+	// entravam na conta e obrigavam a inverter a ordem, mas o balão é preso
+	// dentro do Frame desde que o modo margem foi aposentado: Margens() é
+	// sempre 0, e a tela é a do Frame com ou sem Notas. Planejar primeiro só
+	// gastava — com `--scale 9000`, 282 MB de residente para chegar ao mesmo
+	// erro de teto que `cabeNaTela` dá de graça.
+	if err := cabeNaTela(o, indice, f, 0, 0, 0, 0); err != nil {
+		return nil, err
+	}
+	// Sem `--notes` não há plano: o *Plano nulo atravessa os dois métodos
+	// abaixo sem desenhar nem pedir margem.
 	var plano *notes.Plano
 	if o.notas {
 		plano = notes.Planeja(f, o.escala)
 	}
 	t, d, b, e := plano.Margens()
-	if err := cabeNaTela(o, indice, f, t, d, b, e); err != nil {
-		return nil, err
-	}
 	tela := render.DesenhaFrame(f, o.escala, t, d, b, e, -1)
 	plano.Desenha(tela)
 	nome := fmt.Sprintf("%s-%s.webp", slug(documento), slug(f.Nome))
