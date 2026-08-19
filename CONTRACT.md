@@ -37,15 +37,18 @@ Já implementado e congelado. Leia `internal/scene/scene.go`. Resumo:
 ```go
 type Tom int                    // 100 (quase branco) .. 900 (quase preto)
 const TomFrame Tom = 100        // fundo fixo de todo Frame
-const TomChrome Tom = 900       // extremo reservado ao Chrome
+const TomChrome Tom = 900       // extremo reservado ao plano de anotação
 func TomDaElevacao(elevacao int) Tom
 func (t Tom) Cinza() uint8
 
 type Forma int; const (Retangulo Forma = iota; Circulo; Texto)
 type Alinhamento int; const (AoCentro Alinhamento = iota; AEsquerda)
 
+type Espaco struct{ X, Y, L, A float64 } // caixa em que as % do nó foram projetadas
+
 type Elemento struct {
     Caminho     string   // caminho estável na árvore; último segmento = id se houver
+    Local       string   // caminho de chaves YAML do nó de origem; NÃO é único
     ID          string   // "" quando não declarado
     Forma       Forma
     X, Y, L, A  float64  // px absolutos no Frame; âncora = canto superior esquerdo, sempre
@@ -60,6 +63,7 @@ type Elemento struct {
     Detalhe     string   // parâmetros do Controle formatados para o inspect; só na cabeça
     Interno     bool     // peça de dentro de um Controle: existe no desenho, não na árvore
     Alinhamento Alinhamento // posição do Rotulo na sua área; só vale em Forma Texto
+    Espaco      Espaco   // espaço local do nó; é a base das % que o diagnóstico sugere
 }
 type Camada struct { Nome string; Elementos []Elemento }
 type Frame struct { Nome string; L, A int; Camadas []Camada }
@@ -389,7 +393,7 @@ não muda o layout.
 ```
 draftboard render   <arquivo.yaml> [--out DIR] [--scale N] [--notes] [--layers]
 draftboard board    <arquivo.yaml> [--out DIR]
-draftboard inspect  <arquivo.yaml>
+draftboard inspect  <arquivo.yaml> [--fix]
 draftboard validate <arquivo.yaml>
 draftboard skill    [--install [DIR]]
 ```
@@ -400,8 +404,18 @@ draftboard skill    [--install [DIR]]
 - `--notes` espia o argumento seguinte: se ele for exatamente `margin`, `float` ou `off`,
   consome-o e sai com **código 1** e a mensagem de migração dos modos aposentados. Qualquer
   outra coisa não é consumida — `render --notes doc.yaml` funciona.
+- Na forma `--notes=VALOR` o valor é da opção e não do comando: `--notes=margin`,
+  `--notes=off` e `--notes=float` dão a mensagem de migração, e qualquer outro valor —
+  inclusive o vazio — sai com **código 1** dizendo que a opção não aceita valor. Sem esta
+  regra, `--notes=true doc.yaml` culpava o Documento por um argumento em excesso.
+- `--fix` só existe em `inspect`; nos outros verbos é `opção desconhecida "--fix"`, código
+  1. Também não aceita valor: `--fix=VALOR` é erro de uso.
 - `render` imprime no **stdout apenas os caminhos escritos**, um por linha, na ordem de geração.
-- `inspect` imprime a árvore no stdout e não toca em disco.
+- `inspect` imprime a árvore no stdout e não toca em disco. Com `--fix`, reescreve o `w`
+  dos Retângulos cujo Rótulo não cabe, imprime uma linha de troca por conserto no stderr
+  (`frames[0].layers[0].elements[2]: w 20 → 47`, os números por
+  `strconv.FormatFloat(v, 'g', -1, 64)`) e imprime no stdout a árvore da **segunda**
+  resolução. Sem nada a consertar, não escreve no arquivo.
 - `validate` não imprime nada no stdout em caso de sucesso.
 - Avisos vão para **stderr**, com prefixo `aviso: `. Erros vão para **stderr**, com
   prefixo `erro: `, e saem com **código 1**. Sucesso sai com **0**.
@@ -461,7 +475,71 @@ aninhamento > **16**, `repeat.n` < 1, `axis` fora de {x,y}, `slot` em Documento,
 
 **Aviso** (código 0, renderiza mesmo assim): Elemento fora do Frame (recortado),
 Elemento de área zero, Slot sem preenchimento e sem `default` (renderiza Superfície vazia
-com o degrau de Elevação).
+com o degrau de Elevação), Rótulo que não cabe num Retângulo que a máquina sabe alargar.
+
+**Erro de diagnóstico** (código 1, **e o comando faz o seu trabalho assim mesmo**):
+Rótulo que não cabe num Retângulo que a máquina NÃO sabe alargar, e Nota acima de
+`notes.LimiteDaNota` runas. A diferença de natureza é a que o vocabulário já registra: os
+Erros de cima impedem de saber o que desenhar, este descreve um desenho que já existe e
+está errado. `render` escreve as imagens, `board` escreve a Prancheta e `inspect` imprime
+a árvore antes de o processo sair com 1.
+
+### 8d. `internal/diag` e `internal/fix` (adendo, congelado, dono F11)
+
+```go
+package diag
+
+// Confere mede o Documento já resolvido e devolve o que não cabe, separado por
+// corrigibilidade. alargavel responde se a máquina consegue consertar o nó
+// sozinha, e por que não quando não consegue; nil significa que nada é
+// alargável e tudo que não couber é Erro.
+func Confere(arquivo string, doc *scene.Documento,
+    alargavel func(local string) (bool, string)) ([]scene.Aviso, []*scene.Erro)
+
+// Alargamentos devolve os consertos correspondentes aos Avisos que Confere
+// emitiria: um por nó do YAML.
+func Alargamentos(doc *scene.Documento,
+    alargavel func(local string) (bool, string)) []Alargamento
+
+type Alargamento struct{ Local string; W float64 }
+```
+
+```go
+package fix
+
+func Abre(arquivo string) (*Arquivo, error)
+func (a *Arquivo) Alargavel(local string) (bool, string)
+func (a *Arquivo) Alarga(local string, w float64) error
+func (a *Arquivo) Grava() ([]Troca, error)
+
+type Troca struct{ Local string; De, Para float64 }
+```
+
+- A **categoria vem da corrigibilidade**, não da gravidade: o que a máquina conserta
+  sozinha é Aviso, o que exige julgamento do autor é Erro.
+- `diag` importa `render` (para medir glifos) e `notes` (para o teto da Nota), e **não
+  importa `fix`**: a corrigibilidade chega como predicado.
+- A régua é uma só por chamada, `render.NewCanvas(1, 1, 0, 0, 0, 0, 1)`. A escala é 1
+  porque o diagnóstico é do Documento, não da invocação.
+- Só os Elementos de `Forma == scene.Texto && Controle == ""` são medidos: o Rótulo de
+  Controle fica fora, e está registrado em `docs/PENDENCIAS.md`.
+- Não existe diagnóstico de transbordo **vertical**: a área satura em
+  `min(alturaDoRotulo, A)` e a fonte é `0,45 * A`, então a caixa de linha cabe por
+  construção.
+- O `w` sugerido é `ceil(100 * (largura + (dono.L - rotulo.L)) / dono.Espaco.L)`:
+  arredondado para cima, e com o respiro de volta, porque um Aviso que sugere um conserto
+  que não conserta é pior que nenhum.
+- O diagnóstico é **deduplicado por `Local`**: a frase é sobre o nó que o autor escreveu,
+  e um nó materializa vários Elementos.
+- `fix` troca **só os bytes do escalar**: não reserializa o Documento, porque
+  reserializar perde comentários, ordem e estilo de bloco. As posições vêm de
+  `Line`/`Column` do nó do valor, com `Column` contada em **runas**, e os deslocamentos
+  são medidos contra o buffer original e aplicados em ordem decrescente.
+- `Grava` resolve symlink até o alvo real, confere a permissão do alvo, escreve num
+  temporário do mesmo diretório, copia o modo e renomeia. Recusa quando o arquivo mudou
+  de tamanho ou de mtime desde `Abre`. Erro de permissão sai como `*scene.Erro`.
+- `schema.No` **não** ganha posição: linha de arquivo é conhecimento de quem faz
+  cirurgia.
 
 ### 8b. Tetos de materialização (adendo, congelado)
 

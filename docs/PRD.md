@@ -152,18 +152,18 @@ escopo original carregava.
     não gaste decisão nem tokens escolhendo onde ela cabe.
 31. Como agente, quero que a Nota seja ligada por uma linha de chamada ao seu
     Elemento, para que a associação seja inequívoca mesmo com muitas notas.
-32. Como agente, quero renderizar as Notas numa margem ao redor do Frame, para
-    que elas nunca ocultem o desenho.
+32. Como agente, quero que a renderização saia **sem Nota nenhuma** por padrão,
+    para que a imagem que eu mostro seja o desenho e nada mais.
 33. Como agente, quero renderizar as Notas flutuando sobre o desenho, perto da
-    âncora, para que eu gere uma versão compacta quando o espaço importa.
-34. Como agente, quero desligar as Notas na renderização, para que eu gere a
-    versão limpa do mesmo arquivo sem editá-lo.
-35. Como agente, quero que o modo de Nota seja opção da linha de comando e não
-    do Documento, para que eu produza as três versões sem tocar no YAML.
-36. Como usuário, quero que o Chrome ao redor do Frame use um tom reservado, para
-    que a fronteira do Frame seja inconfundível.
-37. Como agente, quero que a margem cresça o quanto for preciso pra caber as
-    Notas, para que texto longo nunca seja truncado.
+    âncora, para que eu gere a versão anotada do mesmo arquivo sem editá-lo.
+34. Como agente, quero que a Nota apareça na inspeção da Prancheta, para que eu
+    leia a anotação sem que ela dispute espaço com o desenho.
+35. Como agente, quero que a exibição da Nota seja opção da linha de comando e
+    não do Documento, para que eu produza as duas versões sem tocar no YAML.
+36. Como usuário, quero que o balão da Nota use um tom reservado, para que a
+    anotação nunca seja confundida com um Elemento do desenho.
+37. Como agente, quero que a Nota acima do teto de tamanho seja diagnosticada,
+    para que eu encurte o texto em vez de descobrir o corte na imagem.
 38. Como agente, quero que o texto da Nota quebre em várias linhas, para que eu
     escreva uma frase inteira sem estourar o layout.
 
@@ -316,8 +316,8 @@ escopo original carregava.
   espaço pra mais um passo, a direção do deslocamento inverte. Isso garante que
   Superfícies adjacentes sempre difiram e que a escala nunca esgote, a qualquer
   profundidade.
-- O Chrome usa o extremo escuro da escala, reservado — a escada de Elevação
-  nunca alcança esse tom, então chrome e desenho jamais se confundem.
+- O balão da Nota usa o extremo escuro da escala, reservado — a escada de
+  Elevação nunca alcança esse tom, então anotação e desenho jamais se confundem.
 
 ### Componentes, Slots e Repetição
 
@@ -353,18 +353,39 @@ escopo original carregava.
   vazia sem Elemento.
 - Nota não participa da Elevação e não aparece no export por Camada. São dois
   planos separados: desenho e anotação.
-- O modo de exibição é opção de linha de comando, nunca do Documento: margem
-  (padrão), flutuante, ou desligado. O YAML descreve o que existe; a CLI decide
-  como mostrar.
-- No modo margem, a tela de saída é maior que o Frame: o Chrome envolve o Frame e
-  as Notas são empilhadas nele, com linha de chamada até o Elemento. O
-  posicionamento é automático — a resolução de colisão é essencialmente
-  unidimensional, ordenando por altura da âncora, o que torna o algoritmo simples
-  e o resultado estável entre edições.
-- No modo flutuante, a Nota é posicionada perto da âncora, sobre o desenho, e a
-  tela mantém as dimensões do Frame.
-- O texto quebra em múltiplas linhas com largura máxima fixa; a margem cresce
-  pra acomodar.
+- A exibição é opção de linha de comando, nunca do Documento: sem Nota (padrão)
+  ou com balões flutuantes. O YAML descreve o que existe; a CLI decide como
+  mostrar.
+- A Nota é posicionada perto da âncora, sobre o desenho, e a tela mantém as
+  dimensões do Frame. O posicionamento é automático e dois balões nunca se
+  cruzam; quem cede é o que chega depois numa ordem que é função só da geometria
+  e do texto, o que torna o resultado estável entre edições.
+- O texto quebra em múltiplas linhas com largura máxima fixa.
+- A Nota tem teto de tamanho, em runas. O layout não o consulta: mede sempre o
+  texto inteiro, e quem transforma o excesso em Erro é o diagnóstico. Truncar no
+  desenho esconderia o problema exatamente onde ele importa.
+
+### Diagnóstico por corrigibilidade
+
+- A categoria de um problema vem da **corrigibilidade**, não da gravidade: o que
+  a máquina conserta sozinha é Aviso, o que exige julgamento do autor é Erro. A
+  alternativa — categoria por gravidade — produzia Aviso para nó que a máquina
+  não sabe endereçar, e um lote com um único nó desses não escrevia nenhuma das
+  outras correções.
+- O Rótulo largo demais é **cortado, nunca quebrado**, e o diagnóstico existe
+  justamente porque o corte é silencioso: o `inspect` dizia que o texto estava
+  lá e a imagem não o mostrava inteiro.
+- O Erro de diagnóstico **não aborta**: a imagem, a Prancheta e a árvore saem do
+  mesmo jeito, e só o código de saída vira 1. Ele descreve um desenho que já
+  existe e está errado, diferente do erro de decodificação, que impede de saber
+  o que desenhar.
+- O diagnóstico é do Documento, não da invocação: não muda com o fator de escala
+  nem com a opção que esconde a Nota. Um Documento não fica correto por ser
+  renderizado com a opção que esconde o defeito.
+- `inspect --fix` aplica o conserto no arquivo do autor e imprime a árvore já
+  corrigida. Só o `w` é alargado, só de Retângulo escrito direto no Documento, e
+  só trocando os bytes do número: o autor não pediu para reformatar o arquivo,
+  pediu um número maior.
 
 ### Interface de linha de comando
 
@@ -427,7 +448,7 @@ cobrem a semântica inteira sem nenhum seam interno:
 - Geometria: âncora, conversão de porcentagem, recorte na borda, diâmetro de
   Círculo em Frame não-quadrado.
 - Elevação e Tom: contenção geométrica, degrau por Camada, passo de dois níveis,
-  reversão no extremo da escala, tom reservado do Chrome.
+  reversão no extremo da escala, tom reservado do balão da Nota.
 - Componentes: reescala em caixa de proporção diferente, redondeza preservada,
   aninhamento de Componente em Componente, Elevação atravessando fronteira.
 - Slots: preenchimento por Componente, por Elementos inline, conteúdo padrão, e
@@ -449,7 +470,10 @@ que uma falha de renderização não seja confundida com falha de resolução. C
 - Determinismo: a mesma entrada produz bytes idênticos.
 - Canto arredondado ligado e desligado, e o limite de raio em Elemento pequeno.
 - Fator de escala produzindo dimensões proporcionais.
-- Os três modos de Nota, incluindo o crescimento da margem com texto longo.
+- A Nota desenhada e a Nota ausente, e balões vizinhos que não se cruzam.
+- O diagnóstico: Rótulo que não cabe vira Aviso quando a máquina sabe alargar o
+  Retângulo, e Erro com a razão quando não sabe; o `w` sugerido conserta de
+  primeira; `inspect --fix` reescreve o arquivo sem reformatá-lo.
 - Export por Camada cumulativo.
 - Validade do arquivo WebP e as dimensões de saída esperadas.
 
@@ -486,7 +510,7 @@ e testá-los congela decisões que devem permanecer livres.
 ## Further Notes
 
 O vocabulário do domínio está em `CONTEXT.md` na raiz. Os termos ali (Frame,
-Camada, Elemento, Superfície, Elevação, Tom, Chrome, Componente, Instância,
+Camada, Elemento, Superfície, Elevação, Tom, Rótulo, Componente, Instância,
 Slot, Repetição, Nota) devem ser usados na implementação, nas mensagens de erro
 e na skill. Consistência de vocabulário entre a documentação e a saída da
 ferramenta é parte do que a torna barata de aprender.

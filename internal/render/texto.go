@@ -31,7 +31,7 @@ func fonteBase() *truetype.Font {
 }
 
 // Texto escreve uma linha de texto no plano de anotação. As coordenadas são
-// relativas ao canto superior esquerdo da tela inteira, Chrome incluso, e y é o
+// relativas ao canto superior esquerdo da tela inteira, e não ao Frame, e y é o
 // TOPO da linha, não a linha de base.
 func (c *Canvas) Texto(x, y float64, s string, tamanho float64, t scene.Tom) {
 	if s == "" {

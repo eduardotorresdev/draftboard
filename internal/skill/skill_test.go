@@ -36,6 +36,7 @@ func TestConteudoTrazAsSecoesEssenciais(t *testing.T) {
 		".webp",
 		"erro: ",
 		"aviso: ",
+		"## Diagnóstico",
 	}
 	for _, s := range secoes {
 		if !strings.Contains(c, s) {
@@ -83,6 +84,11 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"tabela da flag --scale":              "| `--scale N` | `render` | `1` | multiplicador float > 0 de toda a imagem |",
 		"tabela da flag --notes":              "| `--notes` | `render` | desligado | desenha as Notas em balões sobre o Frame; sem ela a imagem sai sem Nota nenhuma |",
 		"tabela da flag --layers":             "| `--layers` | `render` | desligado | uma imagem por Camada, cumulativa (a Camada e todas abaixo) |",
+		"tabela da flag --fix":                "| `--fix` | `inspect` | desligado | reescreve no arquivo o `w` de cada Retângulo cujo Rótulo não cabe, e imprime a árvore já corrigida |",
+		"linha de troca do --fix":             "- `inspect --fix` reescreve o `w` no Documento, imprime uma linha de troca por conserto no stderr (`frames[0].layers[0].elements[2]: w 20 → 47`) e imprime no stdout a árvore **já corrigida**. Sem nada a consertar, não toca no arquivo.",
+		"categoria pela corrigibilidade":      "A categoria vem da **corrigibilidade**, não da gravidade: o que a máquina",
+		"Rótulo cortado e nunca quebrado":     "  Rótulo que não cabe é **cortado, nunca quebrado** — e o corte é diagnosticado, veja",
+		"Erro de diagnóstico que não aborta":  "O Erro de diagnóstico **não aborta**: a imagem, a Prancheta e a árvore saem do",
 		"tabela da flag --install":            "| `--install [DIR]` | `skill` | `~/.claude/skills` | grava a skill em `<DIR>/draftboard/SKILL.md` |",
 		"tabela da flag --sync":               "| `--sync [DIR]` | `skill` | `~/.claude/skills` | regrava a skill só se o conteúdo mudou, perguntando antes |",
 		"tabela da flag --check":              "| `--check` | `update` | desligado | só reporta se há versão nova; não escreve nada |",

@@ -452,8 +452,8 @@ func TestRenderRecusaTelaAcimaDoLimiteDeArea(t *testing.T) {
 	}{
 		{"escala 100", []string{"render", "basico.yaml", "--scale", "100"}, "area-escala-100.txt"},
 		{"escala 10000", []string{"render", "basico.yaml", "--scale", "10000"}, "area-escala-10000.txt"},
-		// O export por Camada não tem Chrome — Notas não aparecem nele — então
-		// a área recusada é a do Frame puro, menor que a do render anotado.
+		// O export por Camada não desenha Nota nenhuma, então a área recusada
+		// é a do Frame puro.
 		{"escala 100 com export por Camada", []string{"render", "basico.yaml", "--scale", "100", "--layers"}, "area-escala-100-camadas.txt"},
 	}
 	for _, c := range casos {
@@ -528,7 +528,7 @@ func TestTetoDeAreaFechaNoLimite(t *testing.T) {
 		{nome: "um pixel abaixo do teto", l: render.LimiteDeArea - 1, a: 1, escala: 1, cabe: true},
 		{nome: "exatamente no teto", l: render.LimiteDeArea, a: 1, escala: 1, cabe: true},
 		{nome: "um pixel acima do teto", l: render.LimiteDeArea + 1, a: 1, escala: 1, cabe: false},
-		{nome: "o Chrome empurra a tela acima do teto", l: render.LimiteDeArea, a: 1, escala: 1, arE: 1, cabe: false},
+		{nome: "a margem empurra a tela acima do teto", l: render.LimiteDeArea, a: 1, escala: 1, arE: 1, cabe: false},
 		{nome: "a escala empurra a tela acima do teto", l: render.LimiteDeArea / 4, a: 1, escala: 2.1, cabe: false},
 	}
 	for _, c := range casos {
