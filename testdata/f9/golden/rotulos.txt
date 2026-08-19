@@ -1,0 +1,8 @@
+documento rotulos
+  frame tela 400x400
+    camada base
+      regiao retangulo 0,0 200x400 tom=300 elev=1 rotulo="Grade"
+      filho retangulo 20,40 80x80 tom=500 elev=2
+      baixo retangulo 240,0 120x10 tom=300 elev=1 rotulo="Baixo"
+      estreito retangulo 240,200 8x40 tom=300 elev=1 rotulo="Fino"
+      centrado retangulo 280,240 80x80 tom=300 elev=1 rotulo="Meio"

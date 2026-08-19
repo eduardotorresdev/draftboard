@@ -1,0 +1,10 @@
+frames:
+  - name: t
+    w: 200
+    h: 100
+    layers:
+      - name: c
+        elements:
+          - control: button
+            box: {x: 10, y: 10, w: 40, h: 20}
+            label: "Salvar"

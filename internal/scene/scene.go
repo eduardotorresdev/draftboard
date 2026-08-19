@@ -84,9 +84,10 @@ const (
 	Retangulo Forma = iota
 	// Circulo é o Elemento redondo. Nunca vira elipse.
 	Circulo
-	// Texto é o Rótulo desenhado dentro de um Controle. É a única Forma que
-	// carrega conteúdo textual no plano do desenho, e só a resolução de um
-	// Controle a produz: não existe nó de Texto solto no YAML.
+	// Texto é o Rótulo desenhado dentro do Elemento que o carrega. É a única
+	// Forma que carrega conteúdo textual no plano do desenho, e só a resolução
+	// a produz — de um Controle do catálogo ou do `label` de um Retângulo:
+	// não existe nó de Texto solto no YAML.
 	Texto
 )
 
@@ -123,6 +124,15 @@ type Elemento struct {
 	// Caminho é o identificador estável do Elemento na árvore resolvida.
 	// Quando o Elemento declara um id, o último segmento é esse id.
 	Caminho string
+	// Local é o caminho de chaves YAML do nó que originou o Elemento,
+	// atravessando a cadeia de Componentes — o mesmo texto que o Aviso e o
+	// Erro imprimem. Preenchido em todo Elemento.
+	//
+	// Não é único: um Controle materializa várias peças e um Retângulo
+	// rotulado materializa dois Elementos, todos do mesmo nó e portanto do
+	// mesmo Local. Quem identifica Elemento é o Caminho; quem quiser falar do
+	// nó que o autor escreveu deduplica por Local.
+	Local string
 	// ID é o identificador declarado no YAML. Vazio quando não declarado.
 	ID string
 	// Forma é Retangulo ou Circulo.
@@ -148,9 +158,16 @@ type Elemento struct {
 	// ou "" quando não há Ligação. Como a Nota, não faz parte do desenho: não
 	// entra na Elevação e o rasterizador a ignora. Só a Prancheta a usa.
 	Destino string
-	// Rotulo é o texto desenhado quando Forma é Texto. Vazio nas demais Formas.
-	// Diferente da Nota: o Rótulo vive no plano do desenho e participa da
-	// Elevação; a Nota vive no plano de anotação e não participa.
+	// Rotulo é o texto do Rótulo. Diferente da Nota: o Rótulo vive no plano do
+	// desenho e participa da Elevação; a Nota vive no plano de anotação e não
+	// participa.
+	//
+	// Aparece em dois Elementos por Rótulo, e Rotulo != "" não implica
+	// Forma == Texto: o Retângulo que declarou `label` também o carrega, e ali
+	// ele existe só para o `inspect`. A área de referência do Rótulo — a que se
+	// desenha, a que se recorta e a que um dia se mede — é sempre a do Elemento
+	// de Forma Texto. Quem desenha e quem mede despacham por Forma, nunca por
+	// Rotulo != "".
 	Rotulo string
 	// Controle é o nome de catálogo do Controle que materializou este Elemento,
 	// preenchido tanto na cabeça quanto nos Elementos internos. Vazio quando o

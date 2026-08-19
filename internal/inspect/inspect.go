@@ -59,6 +59,12 @@ func linhaDoElemento(e scene.Elemento) string {
 	if e.Destino != "" {
 		linha += " para=" + e.Destino
 	}
+	// O Rótulo vai por último e entre aspas: é o único sufixo cujo conteúdo é
+	// texto livre do autor, e um sufixo depois dele não teria como se
+	// distinguir do texto.
+	if e.Rotulo != "" {
+		linha += fmt.Sprintf(" rotulo=%q", e.Rotulo)
+	}
 	return linha
 }
 

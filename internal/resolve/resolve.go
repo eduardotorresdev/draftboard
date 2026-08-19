@@ -45,6 +45,10 @@ func Arquivo(caminho string) (*scene.Documento, []scene.Aviso, error) {
 		if err != nil {
 			return nil, r.fechaAvisos(), err
 		}
+		// O Rótulo é posicionado antes da Elevação: a posição depende da
+		// contenção, que só se conhece com o Frame achatado, e a Elevação
+		// depende da geometria final de cada Elemento.
+		posicionaRotulos(frame.Camadas)
 		atribuiElevacao(frame.Camadas)
 		resolvido.Frames = append(resolvido.Frames, frame)
 	}

@@ -120,6 +120,10 @@ type No struct {
 	ID string
 	// Nota é a anotação textual aninhada, ou "" quando ausente.
 	Nota string
+	// Rotulo é o texto declarado em `label` num nó TipoRetangulo, ou "" quando
+	// ausente. O Controle guarda o seu em Controle.Rotulo: lá o campo é
+	// validado contra o catálogo, e nem todo Controle o aceita.
+	Rotulo string
 	// Destino é o nome do Frame para onde a Ligação aponta, ou "" quando o
 	// nó não declara Ligação.
 	Destino string

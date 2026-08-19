@@ -34,6 +34,11 @@ var (
 	// aceita. Estão em chavesDoNo para que a sugestão de chave próxima os
 	// conheça, e a permissão real é conferida contra o Controle declarado.
 	chavesDeControle = []string{"label", "items", "active", "value"}
+
+	// chavesSoDeControle são os campos que nenhum outro nó aceita. É uma lista
+	// à parte de chavesDeControle porque `label` deixou de ser exclusivo do
+	// Controle: o Retângulo também o aceita, e tem regra e mensagem próprias.
+	chavesSoDeControle = []string{"items", "active", "value"}
 )
 
 // LeDocumento lê e decodifica o arquivo YAML no caminho dado como Documento. O
@@ -378,6 +383,22 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 		}
 	}
 
+	if m.valores["label"] != nil {
+		// O Rótulo é do Retângulo e do Controle, e de mais ninguém: num
+		// Círculo a faixa retangular no topo cairia fora da forma, e nem a
+		// Instância nem o Slot deixam Elemento seu no Documento resolvido para
+		// carregar o texto. O Controle lê o seu em l.controle, contra o
+		// catálogo; aqui só o Retângulo tem o que ler.
+		if no.Tipo != TipoRetangulo && no.Tipo != TipoControle {
+			return No{}, l.erro(local, `campo "label" só é permitido em Retângulo ou Controle`)
+		}
+		if no.Tipo == TipoRetangulo {
+			if no.Rotulo, err = l.texto(m, "label"); err != nil {
+				return No{}, err
+			}
+		}
+	}
+
 	precisaDeCaixa := no.Tipo == TipoInstancia || no.Tipo == TipoSlot || no.Tipo == TipoControle
 	if m.valores["box"] != nil {
 		if !precisaDeCaixa {
@@ -411,7 +432,7 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 	}
 
 	if no.Tipo != TipoControle {
-		for _, campo := range chavesDeControle {
+		for _, campo := range chavesSoDeControle {
 			if m.valores[campo] != nil {
 				return No{}, l.erro(local, `campo %q só é permitido em Controle`, campo)
 			}

@@ -1,0 +1,9 @@
+frames:
+  - name: t
+    w: 100
+    h: 100
+    layers:
+      - name: c
+        elements:
+          - circle: {x: 10, y: 10, d: 20}
+            label: "Avatar"

@@ -1,0 +1,21 @@
+frames:
+  - name: tela
+    w: 400
+    h: 400
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 50, h: 100}
+            id: regiao
+            label: "Grade"
+          - rect: {x: 5, y: 10, w: 20, h: 20}
+            id: filho
+          - rect: {x: 60, y: 0, w: 30, h: 2.5}
+            id: baixo
+            label: "Baixo"
+          - rect: {x: 60, y: 50, w: 2, h: 10}
+            id: estreito
+            label: "Fino"
+          - rect: {x: 70, y: 60, w: 20, h: 20}
+            id: centrado
+            label: "Meio"

@@ -177,7 +177,7 @@ func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminh
 		c := desloca(*no.Retangulo, dx, dy)
 		x, y, l, a := esp.retangulo(c)
 		r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
-		return nil
+		return r.rotuloDoRetangulo(no, caminho, ctx, dest, x, y, l, a)
 	case schema.TipoCirculo:
 		d := *no.Circulo
 		d.X, d.Y = d.X+dx, d.Y+dy
@@ -376,6 +376,8 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		Origem:      ctx.origem,
 		Nota:        no.Nota,
 		Destino:     no.Destino,
+		Rotulo:      no.Rotulo,
+		Local:       local,
 	})
 }
 
@@ -493,6 +495,7 @@ func (r *resolucao) controle(no schema.No, esp espaco, caixa schema.Caixa, camin
 			Alinhamento: peca.Alinhamento,
 			Controle:    no.Controle.Nome,
 			Interno:     i > 0,
+			Local:       local,
 		}
 		if i == 0 {
 			e.ID = no.ID

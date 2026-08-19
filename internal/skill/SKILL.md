@@ -100,13 +100,15 @@ Exatamente **uma** chave discriminante por nó: `rect`, `circle`, `use`, `slot` 
 
 | Nó | Valor | Chaves adicionais permitidas |
 | --- | --- | --- |
-| `rect: {x, y, w, h}` | geometria em % | `round`, `id`, `note`, `to`, `repeat` |
+| `rect: {x, y, w, h}` | geometria em % | `round`, `label`, `id`, `note`, `to`, `repeat` |
 | `circle: {x, y, d}` | geometria em % | `id`, `note`, `to`, `repeat` |
 | `use: "./comp.yaml"` | caminho relativo | `box` (**obrigatório**), `slots`, `id`, `note`, `repeat` |
 | `slot: "nome"` | nome do Slot | `box` (**obrigatório**), `default`, `id`, `note`, `repeat` |
 | `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `to`, `repeat`, e os campos do Controle |
 
 - `round: true` só existe em `rect`. Cantos retos é o padrão.
+- `label` só existe em `rect` e em `control`: é o Rótulo, o nome do bloco no plano do
+  desenho. Num `circle`, num `use` ou num `slot` é erro.
 - `slots` só existe em `use`. `default` (lista de nós) só existe em `slot`.
 - `slot` só é válido dentro de Componente — nunca em Documento.
 - `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.
@@ -157,6 +159,36 @@ parâmetros declarados. O que ele materializa por dentro não aparece na árvore
 - O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de
   fonte, de alinhamento nem de cor**, pela mesma razão que não existe campo de Tom.
 - Rótulo que não cabe é recortado na área do Controle.
+
+## Rótulo no Retângulo
+
+`label` num `rect` desenha o nome do bloco **dentro dele**, no plano do desenho: ao
+contrário da Nota, participa da Elevação, sai no export por Camada e está na imagem.
+
+```yaml
+- rect: {x: 4, y: 6, w: 92, h: 40}
+  label: "Resultados"
+  # contém filhos -> faixa no topo, à esquerda
+- rect: {x: 4, y: 52, w: 44, h: 12}
+  label: "Filtros"
+  # vazio -> caixa centrada na vertical
+```
+
+**A posição é derivada, não declarada.** Retângulo que contém geometricamente outro
+Elemento apoia o Rótulo numa faixa no topo, alinhada à esquerda, fora do caminho dos
+filhos; Retângulo vazio o centraliza na vertical. Ganhar um filho move o Rótulo
+sozinho. Não existe chave para forçar nem para desligar.
+
+- A caixa do Rótulo tem **28 px de altura** no espaço do Frame, saturando na altura do
+  Retângulo quando ele é mais baixo, e recua 6 px de cada lado. A altura é fixa, e não
+  uma fração do bloco: um bloco de 400 px de altura teria um Rótulo de mockup.
+- Cabe cerca de 28 px de altura de texto, e só uma linha: o Rótulo **não quebra**.
+  Texto que não cabe é recortado na área dele. Um Rótulo que estoura o bloco no
+  wireframe vai estourar o componente na UI.
+- O tamanho da fonte é derivado da altura da caixa, como no Controle — sem campo de
+  fonte, de alinhamento nem de cor.
+- No `inspect`, o Rótulo aparece como sufixo `rotulo="..."` na linha do próprio
+  Retângulo; o texto não vira uma linha a mais na árvore.
 
 ## Ligações e Prancheta
 
@@ -304,7 +336,7 @@ Indentação de 2 espaços por nível; coordenadas arredondadas para inteiro.
 documento <nome>
   frame <nome> <L>x<A>
     camada <nome>
-      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>]
+      <caminho> <retangulo|circulo|texto> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>][ rotulo="<texto>"]
         nota: <texto>
 ```
 
@@ -312,7 +344,8 @@ documento <nome>
 lista, ou o `id` declarado quando houver. Uma Instância acrescenta um segmento por nível
 de Componente; um Slot acrescenta o segmento com o nome do Slot.
 Exemplos: `e0`, `header`, `e3/e1`, `e3/body/e0`. `de=` só aparece para Elementos vindos
-de Componente. `para=` só aparece para Elementos que declaram Ligação.
+de Componente. `para=` só aparece para Elementos que declaram Ligação. `rotulo=` só
+aparece para Retângulos com `label`, e vai sempre por último na linha.
 
 ## Erros × avisos
 
