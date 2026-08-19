@@ -95,7 +95,7 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"regra da Ligação com repeat":         "- `to` **não convive com `repeat`** no mesmo nó: repetir o gatilho não repete a seta.",
 		"fórmula do Círculo no Frame":         "Círculo:  L = A = d/100*FL      (largura nos dois eixos — nunca vira elipse)",
 		"fórmula do Círculo no espaço local":  "Círculo:  L = A = d/100*bl",
-		"linha de Elemento do inspect":        "      <caminho> <retangulo|circulo> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>]",
+		"linha de Elemento do inspect":        "      <caminho> <retangulo|circulo|texto> <X>,<Y> <L>x<A> tom=<T> elev=<E>[ round][ de=<componente>][ controle=<nome> <parâmetros>][ para=<frame>][ rotulo=\"<texto>\"]",
 		"tabela do nó control":                "| `control: nome` | nome do catálogo | `box` (**obrigatório**), `id`, `note`, `to`, `repeat`, e os campos do Controle |",
 		"regra de Controle fechado":           "- `control` é fechado: não aceita `slots`, `default` nem `round`, e não recebe conteúdo.",
 		"catálogo do Controle button":         "| `button` | `label` | sem `label`, o rótulo vira barra cinza |",
@@ -112,7 +112,12 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 		"catálogo do Controle progress":       "| `progress` | `value` | `value: 50` |",
 		"regra dos dois estados":              "- Em `checkbox` e `toggle`, `active` só aceita 0 ou 1: eles têm dois estados, não lista.",
 		"regra das duas formas de items":      "- `items` aceita **número** (itens sem texto) ou **lista de rótulos** (itens com texto).",
+		"posição derivada do Rótulo":          "**A posição é derivada, não declarada.** Retângulo que contém geometricamente outro",
+		"altura da caixa do Rótulo":           "- A caixa do Rótulo tem **28 px de altura** no espaço do Frame, saturando na altura do",
 		"regra da fonte derivada":             "- O tamanho da fonte do Rótulo é derivado da altura da área — **não existe campo de",
+		"posição do sufixo rotulo=":           "de Componente. `para=` só aparece para Elementos que declaram Ligação. `rotulo=` fecha a",
+		"Nota entre aspas na árvore":          "        nota: \"<texto>\"",
+		"teto do label do Retângulo":          "- O texto do Rótulo tem teto de **200 runas**: acima disso a decodificação recusa o",
 	}
 	for fato, linha := range linhas {
 		if !contemLinha(c, linha) {
@@ -122,7 +127,7 @@ func TestSkillNaoDessincroniza(t *testing.T) {
 
 	// O nó rect é o único que aceita `round`, e circle o único com `d`.
 	for fato, linha := range map[string]string{
-		"tabela do nó rect":   "| `rect: {x, y, w, h}` | geometria em % | `round`, `id`, `note`, `to`, `repeat` |",
+		"tabela do nó rect":   "| `rect: {x, y, w, h}` | geometria em % | `round`, `label`, `id`, `note`, `to`, `repeat` |",
 		"tabela do nó circle": "| `circle: {x, y, d}` | geometria em % | `id`, `note`, `to`, `repeat` |",
 	} {
 		if !contemLinha(c, linha) {

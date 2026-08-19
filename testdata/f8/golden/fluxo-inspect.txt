@@ -5,7 +5,7 @@ documento fluxo
       e1 retangulo 48,173 384x50 tom=300 elev=1 round controle=input rotulo="E-mail"
       e2 retangulo 48,245 384x50 tom=300 elev=1 round controle=input rotulo="Senha"
       e3 retangulo 48,331 384x58 tom=300 elev=1 round controle=button rotulo="Entrar" para=dashboard
-        nota: Leva ao painel quando as credenciais valem
+        nota: "Leva ao painel quando as credenciais valem"
       e4 retangulo 144,432 192x22 tom=300 elev=1 para=recuperar
   frame dashboard 1280x800
     camada casca
@@ -20,7 +20,7 @@ documento fluxo
     camada conteudo
       e0 retangulo 0,0 1280x64 tom=300 elev=1
       e1 retangulo 77,112 1126x320 tom=300 elev=1 round
-        nota: Painel do item selecionado
+        nota: "Painel do item selecionado"
       e2 retangulo 77,480 179x40 tom=300 elev=1 round controle=button rotulo="Voltar" para=dashboard
   frame recuperar 480x720
     camada conteudo

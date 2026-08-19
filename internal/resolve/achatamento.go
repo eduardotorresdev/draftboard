@@ -176,8 +176,10 @@ func (r *resolucao) materializa(no schema.No, esp espaco, dx, dy float64, caminh
 	case schema.TipoRetangulo:
 		c := desloca(*no.Retangulo, dx, dy)
 		x, y, l, a := esp.retangulo(c)
-		r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
-		return nil
+		// O Rótulo pendura no caminho que o Retângulo de fato recebeu, e não
+		// no valor bruto: caminhoUnico pode ter sufixado o do dono.
+		emitido := r.acrescenta(dest, no, caminho, ctx, scene.Retangulo, x, y, l, a)
+		return r.rotuloDoRetangulo(no, emitido, ctx, dest, x, y, l, a)
 	case schema.TipoCirculo:
 		d := *no.Circulo
 		d.X, d.Y = d.X+dx, d.Y+dy
@@ -356,7 +358,11 @@ func (r *resolucao) reposiciona(err error, local, referencia string) error {
 // avisos que dependem só da geometria. É o único ponto onde um Elemento nasce,
 // e onde o caminho é desambiguado. O orçamento do Frame já foi debitado pelo
 // clone que trouxe o nó até aqui.
-func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) {
+//
+// Devolve o caminho que o Elemento de fato recebeu, já desambiguado: quem
+// pendura uma peça no caminho do Elemento tem que pendurá-la nesse valor, e não
+// no valor bruto que entrou aqui.
+func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho string, ctx contexto, forma scene.Forma, x, y, l, a float64) string {
 	local := ctx.prefixo + no.Local
 	if x < 0 || y < 0 || x+l > r.frameL || y+a > r.frameA {
 		r.aviso(local, "Elemento fora do Frame: será recortado na borda")
@@ -364,7 +370,7 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 	if l <= 0 || a <= 0 {
 		r.aviso(local, "Elemento de área zero: não aparecerá no desenho")
 	}
-	r.emite(dest, scene.Elemento{
+	return r.emite(dest, scene.Elemento{
 		Caminho:     caminho,
 		ID:          no.ID,
 		Forma:       forma,
@@ -376,15 +382,24 @@ func (r *resolucao) acrescenta(dest *[]scene.Elemento, no schema.No, caminho str
 		Origem:      ctx.origem,
 		Nota:        no.Nota,
 		Destino:     no.Destino,
+		Rotulo:      no.Rotulo,
+		Local:       local,
 	})
 }
 
 // emite acrescenta um Elemento já montado, desambiguando o caminho. Existe para
 // que o Retângulo, o Círculo e cada peça de um Controle nasçam pelo mesmo lugar
 // e portanto compartilhem a regra de unicidade de caminho.
-func (r *resolucao) emite(dest *[]scene.Elemento, e scene.Elemento) {
+//
+// Devolve o caminho já desambiguado, porque quem chama pode precisar dele: dois
+// `rect` de mesmo `id` no mesmo Frame recebem `bloco` e `bloco~2`, e o Rótulo do
+// segundo tem que pendurar em `bloco~2/rotulo`. Montado sobre o valor bruto, ele
+// ficaria pendurado no caminho do primeiro, e quem pareia Rótulo↔dono por
+// prefixo atribuiria o texto ao Retângulo errado.
+func (r *resolucao) emite(dest *[]scene.Elemento, e scene.Elemento) string {
 	e.Caminho = r.caminhoUnico(e.Caminho)
 	*dest = append(*dest, e)
+	return e.Caminho
 }
 
 // caminhoUnico garante que dois Elementos do mesmo Frame nunca compartilhem o
@@ -493,6 +508,7 @@ func (r *resolucao) controle(no schema.No, esp espaco, caixa schema.Caixa, camin
 			Alinhamento: peca.Alinhamento,
 			Controle:    no.Controle.Nome,
 			Interno:     i > 0,
+			Local:       local,
 		}
 		if i == 0 {
 			e.ID = no.ID

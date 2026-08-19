@@ -6,6 +6,7 @@ import (
 	"html"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/eduardotorresdev/draftboard/internal/render"
 	"github.com/eduardotorresdev/draftboard/internal/scene"
@@ -50,9 +51,12 @@ func escreveFrame(b *bufio.Writer, indice int, f scene.Frame, p posicao) {
 	fmt.Fprintf(b, "<g clip-path=\"url(#corte-%d)\">\n", indice)
 	fmt.Fprintf(b, "<rect x=\"0\" y=\"0\" width=\"%s\" height=\"%s\" fill=\"%s\"/>\n",
 		num(float64(f.L)), num(float64(f.A)), cor(scene.TomFrame))
+	// rotulos numera os recortes de Rótulo dentro do Frame: cada um precisa do
+	// seu, porque a área recortada é a do Elemento.
+	rotulos := 0
 	for _, c := range f.Camadas {
 		for _, e := range c.Elementos {
-			escreveElemento(b, c.Nome, e)
+			escreveElemento(b, indice, &rotulos, c.Nome, e)
 		}
 	}
 	fmt.Fprintf(b, "</g>\n</g>\n")
@@ -61,7 +65,7 @@ func escreveFrame(b *bufio.Writer, indice int, f scene.Frame, p posicao) {
 // escreveElemento desenha um Elemento. As peças internas de um Controle são
 // desenhadas — elas existem no desenho — mas não recebem clique: o Controle é
 // fechado, e quem clica nele seleciona o Controle, não o seu miolo.
-func escreveElemento(b *bufio.Writer, camada string, e scene.Elemento) {
+func escreveElemento(b *bufio.Writer, frame int, rotulos *int, camada string, e scene.Elemento) {
 	atributos := fmt.Sprintf(" data-caminho=\"%s\" data-camada=\"%s\" data-forma=\"%s\" data-tom=\"%d\" data-elev=\"%d\"",
 		escapa(e.Caminho), escapa(camada), e.Forma, int(e.Tom), e.Elevacao)
 	atributos += fmt.Sprintf(" data-geo=\"%s,%s %s&times;%s\"", num(e.X), num(e.Y), num(e.L), num(e.A))
@@ -115,8 +119,17 @@ func escreveElemento(b *bufio.Writer, camada string, e scene.Elemento) {
 		if e.Alinhamento == scene.AoCentro {
 			x, ancora = e.X+e.L/2, "middle"
 		}
-		fmt.Fprintf(b, "<text class=\"%s rotulo\" x=\"%s\" y=\"%s\" font-size=\"%s\" text-anchor=\"%s\" fill=\"%s\"%s>%s</text>\n",
-			classe, num(x), num(e.Y+e.A/2), num(tamanho), ancora, cor(e.Tom), atributos, escapa(e.Rotulo))
+		// O Rótulo é recortado na sua própria área, e não só na borda do
+		// Frame: é o que o raster já faz com mascaraDaArea. Sem isto, um
+		// Rótulo mais largo que o bloco sai cortado no WebP e inteiro na
+		// Prancheta, por cima dos vizinhos — o mesmo Documento com dois
+		// desenhos.
+		corte := fmt.Sprintf("rotulo-%d-%d", frame, *rotulos)
+		*rotulos++
+		fmt.Fprintf(b, "<clipPath id=\"%s\"><rect x=\"%s\" y=\"%s\" width=\"%s\" height=\"%s\"/></clipPath>\n",
+			corte, num(e.X), num(e.Y), num(e.L), num(e.A))
+		fmt.Fprintf(b, "<text class=\"%s rotulo\" x=\"%s\" y=\"%s\" font-size=\"%s\" text-anchor=\"%s\" fill=\"%s\" clip-path=\"url(#%s)\"%s>%s</text>\n",
+			classe, num(x), num(e.Y+e.A/2), num(tamanho), ancora, cor(e.Tom), corte, atributos, escapa(e.Rotulo))
 	default:
 		geometria := fmt.Sprintf("x=\"%s\" y=\"%s\" width=\"%s\" height=\"%s\"",
 			num(e.X), num(e.Y), num(e.L), num(e.A))
@@ -198,6 +211,24 @@ func finito(v float64) bool {
 }
 
 // escapa neutraliza o texto vindo do YAML antes de ele entrar no documento.
+//
+// Os caracteres de controle C0 caem fora, antes do escape de marcação: eles não
+// são texto XML válido, e o parser do navegador troca o NUL por U+FFFD. A
+// Prancheta mostraria um caractere que o WebP desenha como `.notdef` — o mesmo
+// Documento com dois desenhos, que é justamente a divergência que o recorte do
+// Rótulo foi fechar. Tabulação, LF e CR ficam: são espaço em branco legítimo.
 func escapa(s string) string {
-	return html.EscapeString(s)
+	return html.EscapeString(strings.Map(semControle, s))
+}
+
+// semControle descarta os caracteres de controle C0 que não são espaço em
+// branco. Devolve -1 para descartar, no protocolo de strings.Map.
+func semControle(r rune) rune {
+	if r < 0x20 && r != '\t' && r != '\n' && r != '\r' {
+		return -1
+	}
+	if r == 0x7f {
+		return -1
+	}
+	return r
 }

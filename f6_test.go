@@ -187,7 +187,6 @@ func TestErrosDeControle(t *testing.T) {
 		{"nome fora do catálogo", "desconhecido.yaml", "desconhecido.txt"},
 		{"campo de outro nó", "campo-proibido.yaml", "campo-proibido.txt"},
 		{"campo de outro Controle", "campo-de-outro.yaml", "campo-de-outro.txt"},
-		{"campo de Controle em Retângulo", "label-em-rect.yaml", "label-em-rect.txt"},
 		{"Controle sem box", "sem-box.yaml", "sem-box.txt"},
 		{"item ativo inexistente", "ativo-alem.yaml", "ativo-alem.txt"},
 		{"lista de Controle vazia", "lista-vazia.yaml", "lista-vazia.txt"},

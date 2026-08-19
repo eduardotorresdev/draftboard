@@ -5,5 +5,5 @@ frames:
     layers:
       - name: c
         elements:
-          - rect: {x: 0, y: 0, w: 50, h: 10}
-            label: "Salvar"
+          - rect: {x: 10, y: 10, w: 20, h: 20}
+            items: 3

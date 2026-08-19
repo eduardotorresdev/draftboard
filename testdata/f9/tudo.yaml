@@ -1,0 +1,21 @@
+frames:
+  - name: t
+    w: 400
+    h: 400
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 0, y: 0, w: 40, h: 20}
+            label: "Topo"
+          - circle: {x: 60, y: 5, d: 10}
+          - control: tabs
+            box: {x: 5, y: 30, w: 80, h: 8}
+            items: ["Perfil", "Conta"]
+          - use: "./cartao.yaml"
+            box: {x: 5, y: 50, w: 40, h: 20}
+            slots:
+              corpo:
+                elements:
+                  - rect: {x: 0, y: 0, w: 100, h: 100}
+          - rect: {x: 5, y: 80, w: 5, h: 5}
+            repeat: {n: 3, axis: x, gap: 2}

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 
@@ -34,7 +35,19 @@ var (
 	// aceita. Estão em chavesDoNo para que a sugestão de chave próxima os
 	// conheça, e a permissão real é conferida contra o Controle declarado.
 	chavesDeControle = []string{"label", "items", "active", "value"}
+
+	// chavesSoDeControle são os campos que nenhum outro nó aceita. É uma lista
+	// à parte de chavesDeControle porque `label` deixou de ser exclusivo do
+	// Controle: o Retângulo também o aceita, e tem regra e mensagem próprias.
+	chavesSoDeControle = []string{"items", "active", "value"}
 )
+
+// LimiteDoRotulo é o teto, em runas, do texto declarado em `label` num `rect`.
+//
+// É o mesmo número do teto da Nota, contado do mesmo jeito e pela mesma razão:
+// são as duas entradas de texto livre do autor, e o limite tem que ser sabido
+// enquanto se escreve. Um Rótulo é nome de bloco — 200 runas já é folgado.
+const LimiteDoRotulo = 200
 
 // LeDocumento lê e decodifica o arquivo YAML no caminho dado como Documento. O
 // tipo do arquivo é inferido pelo conteúdo: declarar `frames` faz dele um
@@ -378,6 +391,32 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 		}
 	}
 
+	if m.valores["label"] != nil {
+		// O Rótulo é do Retângulo e do Controle, e de mais ninguém: num
+		// Círculo a faixa retangular no topo cairia fora da forma, e nem a
+		// Instância nem o Slot deixam Elemento seu no Documento resolvido para
+		// carregar o texto. O Controle lê o seu em l.controle, contra o
+		// catálogo; aqui só o Retângulo tem o que ler.
+		if no.Tipo != TipoRetangulo && no.Tipo != TipoControle {
+			return No{}, l.erro(local, `campo "label" só é permitido em Retângulo ou Controle`)
+		}
+		if no.Tipo == TipoRetangulo {
+			if no.Rotulo, err = l.texto(m, "label"); err != nil {
+				return No{}, err
+			}
+			// O teto é conferido aqui, e recusa, porque o texto do Rótulo era
+			// a única entrada do módulo sem limite: o rasterizador desenha
+			// glifo a glifo mesmo quando a máscara descarta tudo, e um `label`
+			// de 200 000 runas dentro de uma Repetição custa horas de CPU para
+			// produzir uma imagem onde nada aparece. Nomear um bloco não é
+			// problema que a máquina conserte sozinha, então é erro do autor.
+			if n := utf8.RuneCountInString(no.Rotulo); n > LimiteDoRotulo {
+				return No{}, l.erro(local,
+					`campo "label" passou do teto de %d runas: encontrou %d`, LimiteDoRotulo, n)
+			}
+		}
+	}
+
 	precisaDeCaixa := no.Tipo == TipoInstancia || no.Tipo == TipoSlot || no.Tipo == TipoControle
 	if m.valores["box"] != nil {
 		if !precisaDeCaixa {
@@ -411,7 +450,7 @@ func (l *leitor) no(n *yaml.Node, local string) (No, error) {
 	}
 
 	if no.Tipo != TipoControle {
-		for _, campo := range chavesDeControle {
+		for _, campo := range chavesSoDeControle {
 			if m.valores[campo] != nil {
 				return No{}, l.erro(local, `campo %q só é permitido em Controle`, campo)
 			}

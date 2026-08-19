@@ -1,0 +1,12 @@
+frames:
+  - name: tela
+    w: 400
+    h: 400
+    layers:
+      - name: base
+        elements:
+          - rect: {x: 5, y: 10, w: 90, h: 80}
+            id: regiao
+            label: "Resultados"
+          - rect: {x: 5, y: 10, w: 90, h: 20}
+            id: cabecalho

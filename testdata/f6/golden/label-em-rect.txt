@@ -1,1 +1,0 @@
-erro: label-em-rect.yaml: frames[0].layers[0].elements[0]: campo "label" só é permitido em Controle
