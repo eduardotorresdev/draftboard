@@ -148,6 +148,47 @@ Imediatamente depois, e não no fim da Camada, porque a Superfície do Rótulo t
 que ser o Retângulo que o carrega: é dele que vêm a Elevação e o Tom que dão
 contraste ao texto. Empilhado no fim, um filho qualquer viraria a Superfície.
 
+#### 4b. Emenda: o Rótulo sobe para o fim da Camada DEPOIS da Elevação
+
+A ordem de emissão acima resolve a Elevação e **quebra a pintura**: emitido antes
+dos filhos, o Rótulo é pintado antes deles, e qualquer filho que cubra a faixa do
+topo o apaga da imagem em silêncio. O caso é o mais trivial que existe — uma
+região com barra de cabeçalho:
+
+    rect {x:5, y:10, w:90, h:80}  label: "Resultados"
+    rect {x:5, y:10, w:90, h:20}  id: cabecalho
+
+O `inspect` imprime `rotulo="Resultados"`, a geometria e o Tom saem certos, e o
+WebP sai sem texto nenhum. Isso desfaz a promessa da ADR-0002 — "faixa no topo,
+fora do caminho deles" — sem nenhum aviso.
+
+Congelado, então, em duas passagens e não uma:
+
+1. **Antes de `atribuiElevacao`** — `posicionaRotulos` fixa geometria e
+   Alinhamento pela contenção, com o Rótulo ainda adjacente ao dono.
+2. **Depois de `atribuiElevacao`** — uma segunda passagem move cada Elemento de
+   `Forma: Texto` com `Controle == ""` para o **fim da sua Camada**, preservando
+   a Elevação e o Tom já calculados.
+
+É o que dá as duas coisas ao mesmo tempo: o Tom vem do Retângulo que carrega o
+Rótulo, e o texto é pintado por cima de tudo que a Camada desenha. Uma Camada
+posterior continua cobrindo — isso é a Elevação funcionando, não um defeito.
+
+A adjacência continua sendo a invariante das duas primeiras fases, e continua
+precisando de teste. Ela deixa de valer só depois da segunda passagem.
+
+#### 4c. Emenda: o caminho do Rótulo usa o caminho JÁ desambiguado
+
+`caminhoUnico` pode sufixar o caminho do Retângulo, e o Rótulo tem que pendurar
+no caminho que o dono **de fato recebeu**. Com dois `rect` de `id: bloco` e
+`label:` no mesmo Frame, montar o caminho do Rótulo sobre o valor bruto produz
+`bloco`, `bloco/rotulo`, `bloco~2`, `bloco/rotulo~2` — e o Rótulo do segundo
+bloco fica pendurado no caminho do primeiro. Quem parear Rótulo↔dono por prefixo
+— o painel da Prancheta e o `--fix` de F11 — atribui o texto ao Retângulo errado.
+
+`acrescenta`/`emite` devolvem o caminho já desambiguado, e é esse valor que vai
+para a montagem do caminho do Rótulo.
+
 ### 5. Regra de posição
 
 Retângulo que **contém outro Elemento** → faixa no topo, `scene.AEsquerda`.
