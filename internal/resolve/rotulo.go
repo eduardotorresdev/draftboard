@@ -15,13 +15,19 @@ import (
 // fonte de 180 px, que é mockup, não wireframe.
 const alturaDoRotulo = 28.0
 
-// respiroDoRotulo é a folga em cada ponta horizontal, em px do espaço do Frame,
+// RespiroDoRotulo é a folga em cada ponta horizontal, em px do espaço do Frame,
 // entre a borda do Retângulo e a área do Rótulo.
 //
 // É geometria, e é entregue já descontada da área do Elemento de Texto: se
 // morasse no desenhista, a Prancheta e o WebP teriam cada um a sua regra de
 // afastamento, e o mesmo Documento sairia diferente nos dois.
-const respiroDoRotulo = 6.0
+//
+// É exportada porque quem sugere um `w` maior precisa devolver o respiro POR
+// VALOR: a diferença observada entre a largura do Retângulo e a da área do
+// Rótulo só vale o dobro do respiro enquanto o Retângulo for mais largo que
+// ele. Num Retângulo de 2 px a área satura em zero, a diferença vale 2, e um
+// `w` calculado por diferença sai curto e não conserta de primeira.
+const RespiroDoRotulo = 6.0
 
 // SegmentoDoRotulo é o segmento fixo que o Rótulo acrescenta ao caminho do
 // Retângulo. Fixo de propósito: sem ele, caminhoUnico desambiguaria o Rótulo
@@ -155,8 +161,8 @@ func posiciona(rotulo, retangulo *scene.Elemento, todos []*scene.Elemento) {
 	// de 10 px transbordaria por baixo dele e apagaria o vizinho.
 	a := math.Min(alturaDoRotulo, retangulo.A)
 
-	rotulo.X = retangulo.X + respiroDoRotulo
-	rotulo.L = math.Max(0, retangulo.L-2*respiroDoRotulo)
+	rotulo.X = retangulo.X + RespiroDoRotulo
+	rotulo.L = math.Max(0, retangulo.L-2*RespiroDoRotulo)
 	rotulo.A = a
 	if temFilho(retangulo, todos) {
 		rotulo.Y = retangulo.Y

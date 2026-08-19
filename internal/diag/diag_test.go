@@ -92,6 +92,70 @@ func TestRotuloCortadoViraAvisoQueConsertaDePrimeira(t *testing.T) {
 	}
 }
 
+// TestRetanguloMaisEstreitoQueORespiro fecha o caso em que a área do Rótulo
+// satura em zero.
+//
+// posiciona satura a largura da área em max(0, dono.L - 2*respiro): num
+// Retângulo de 2 px a diferença observada entre o Retângulo e a área do Rótulo
+// vale 2, e não 12. Quem devolve o respiro POR DIFERENÇA sugere um `w` curto, e
+// a mesma chamada que imprime "w 2 → 12" já pede um `w: 13` — o conserto pede
+// outro conserto, e a promessa de consertar de primeira cai.
+func TestRetanguloMaisEstreitoQueORespiro(t *testing.T) {
+	const espacoL = 400
+	estreito := frame("Config", 0, 2, espacoL, "")
+	if l := estreito.Camadas[0].Elementos[1].L; l != 0 {
+		t.Fatalf("área do Rótulo = %v; o caso só prova algo se ela saturar em zero", l)
+	}
+	consertos := Alargamentos(documento(estreito), sempreAlargavel)
+	if len(consertos) != 1 {
+		t.Fatalf("consertos = %v; queria exatamente um", consertos)
+	}
+
+	larguraNova := consertos[0].W / 100 * espacoL
+	avisos, erros := Confere("doc.yaml", documento(frame("Config", 0, larguraNova, espacoL, "")), sempreAlargavel)
+	if len(avisos) != 0 || len(erros) != 0 {
+		t.Errorf("depois de aplicar w=%v: avisos = %v, erros = %v; o conserto não consertou de primeira",
+			consertos[0].W, avisos, erros)
+	}
+}
+
+// TestOWSugeridoArredondaParaCima calibra o caso numa fração PEQUENA, que é o
+// único lugar onde arredondar para cima se distingue de arredondar para o mais
+// próximo.
+//
+// Num espaço de 1000 px o Rótulo pede 130,21875 px, isto é 13,021875% — fração
+// 0,02. Ceil dá 14; Round e Floor dão os dois 13, e 13% é um Retângulo de 130 px
+// cuja área de Rótulo tem 118 px para um Rótulo de 118,22: continua cortado. Um
+// Aviso que sugere um conserto que não conserta é pior que nenhum.
+//
+// Um caso de fração 0,5 — que é onde caem todas as outras fixtures — não separa
+// Ceil de Round: os dois devolvem o mesmo inteiro.
+func TestOWSugeridoArredondaParaCima(t *testing.T) {
+	const espacoL = 1000
+	consertos := Alargamentos(documento(frame("Resultados da busca", 0, 60, espacoL, "")), sempreAlargavel)
+	if len(consertos) != 1 {
+		t.Fatalf("consertos = %v; queria exatamente um", consertos)
+	}
+	if consertos[0].W != 14 {
+		t.Errorf("w sugerido = %v, queria 14: 13,021875%% arredondado PARA CIMA", consertos[0].W)
+	}
+
+	// O inteiro imediatamente abaixo continua cortando. É esta linha que
+	// distingue Ceil de Round: se o sugerido fosse 13, o próprio round-trip
+	// abaixo teria de acusar o corte de novo.
+	avisos, erros := Confere("doc.yaml", documento(frame("Resultados da busca", 0, 13.0/100*espacoL, espacoL, "")), sempreAlargavel)
+	if len(avisos)+len(erros) != 1 {
+		t.Fatalf("com w = 13: avisos = %v, erros = %v; queria o corte ainda acusado — o caso não separa Ceil de Round", avisos, erros)
+	}
+
+	// E o sugerido conserta de primeira.
+	larguraNova := consertos[0].W / 100 * espacoL
+	avisos, erros = Confere("doc.yaml", documento(frame("Resultados da busca", 0, larguraNova, espacoL, "")), sempreAlargavel)
+	if len(avisos) != 0 || len(erros) != 0 {
+		t.Errorf("depois de aplicar w=%v: avisos = %v, erros = %v; queria silêncio", consertos[0].W, avisos, erros)
+	}
+}
+
 // TestCategoriaVemDaCorrigibilidade fixa a inversão que dá nome à entrega: o
 // mesmo Rótulo cortado é Aviso ou Erro conforme a máquina consiga ou não
 // consertá-lo, e a razão viaja na mensagem.

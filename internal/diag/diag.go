@@ -99,15 +99,13 @@ func (a achado) msg() string {
 // confere percorre o Documento uma vez e devolve todos os achados, na ordem de
 // pintura.
 //
-// A régua é uma só por chamada: cada Canvas carrega o seu cache de faces, e um
-// por Elemento num Documento de dez mil Elementos seriam dez mil caches. A
-// escala é 1 porque o diagnóstico é do Documento, não da invocação — `--scale`
-// não muda o que cabe.
+// A régua é render.LarguraDoDiagnostico, que mede sem hinting e sem escala: o
+// diagnóstico é do Documento, e não da invocação — `--scale` não muda o que
+// cabe, e o avanço ideal da fonte é justamente o que não depende dela.
 func confere(doc *scene.Documento, alargavel func(local string) (bool, string)) []achado {
 	if alargavel == nil {
 		alargavel = semPredicado
 	}
-	regua := render.NewCanvas(1, 1, 0, 0, 0, 0, 1)
 	var achados []achado
 	for _, f := range doc.Frames {
 		donos := donosDoFrame(f)
@@ -125,7 +123,7 @@ func confere(doc *scene.Documento, alargavel func(local string) (bool, string)) 
 				if e.Forma != scene.Texto || e.Controle != "" {
 					continue
 				}
-				if a, achou := mede(regua, e, donos, alargavel); achou {
+				if a, achou := mede(e, donos, alargavel); achou {
 					achados = append(achados, a)
 				}
 			}
@@ -172,8 +170,8 @@ const razaoSemConserto = "-"
 
 // mede diz se o Rótulo cabe na área que a resolução lhe deu e, quando não cabe,
 // monta o achado já classificado.
-func mede(regua *render.Canvas, e scene.Elemento, donos map[string]scene.Elemento, alargavel func(string) (bool, string)) (achado, bool) {
-	largura, _ := regua.MedeTexto(e.Rotulo, render.TamanhoDoRotulo(e.A))
+func mede(e scene.Elemento, donos map[string]scene.Elemento, alargavel func(string) (bool, string)) (achado, bool) {
+	largura := render.LarguraDoDiagnostico(e.Rotulo, render.TamanhoDoRotulo(e.A))
 	if largura <= e.L {
 		return achado{}, false
 	}
@@ -207,7 +205,12 @@ func mede(regua *render.Canvas, e scene.Elemento, donos map[string]scene.Element
 	// A largura necessária é a do RETÂNGULO, não a da área do Rótulo: a
 	// resolução já descontou o respiro de cada ponta, e devolvê-lo aqui é o que
 	// impede o `w` sugerido de sair curto e não consertar nada.
-	necessarioNoRetangulo := largura + (dono.L - e.L)
+	//
+	// O respiro volta POR VALOR, e não pela diferença `dono.L - e.L`: a área do
+	// Rótulo satura em zero, então num Retângulo mais estreito que o dobro do
+	// respiro a diferença vale a largura inteira do Retângulo, o `w` sugerido
+	// sai curto, e a mesma chamada que conserta já pede outro conserto.
+	necessarioNoRetangulo := largura + 2*resolve.RespiroDoRotulo
 	// Arredondado para cima: um `w` que arredonda para baixo continua cortando,
 	// e um Aviso que sugere um conserto que não conserta é pior que nenhum.
 	a.w = math.Ceil(100 * necessarioNoRetangulo / dono.Espaco.L)
