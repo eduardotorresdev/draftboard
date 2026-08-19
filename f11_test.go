@@ -322,19 +322,30 @@ func TestDiagnosticoNaoMudaComAEscala(t *testing.T) {
 // limite medido em bytes recusaria uma Nota que o autor escreveu dentro do
 // limite publicado.
 func TestDiagnosticoDaNotaContaRunas(t *testing.T) {
-	naPastaDeDiagnostico(t)
-
-	codigo, _, stderr := executa("validate", "nota-no-limite.yaml")
-	if codigo != 0 || stderr != "" {
-		t.Errorf("no limite: código = %d, stderr = %q; queria silêncio", codigo, stderr)
-	}
-	codigo, _, stderr = executa("validate", "nota-longa.yaml")
-	if codigo != 1 {
-		t.Errorf("acima do limite: código = %d, queria 1", codigo)
-	}
-	if !strings.Contains(stderr, "a Nota tem 201 runas, acima do limite de 200; encurte-a") {
-		t.Errorf("stderr = %q, queria a recusa da Nota comprida", stderr)
-	}
+	t.Run("no limite", func(t *testing.T) {
+		naPastaDeDiagnostico(t)
+		codigo, _, stderr := executa("validate", "nota-no-limite.yaml")
+		if codigo != 0 || stderr != "" {
+			t.Errorf("código = %d, stderr = %q; queria silêncio", codigo, stderr)
+		}
+	})
+	// Acima do limite a imagem sai do mesmo jeito, inclusive num `render` sem
+	// `--notes`, que não desenha Nota nenhuma: o artefato diagnosticado é o
+	// Documento, não a invocação. Um Documento não fica correto por ser
+	// renderizado com a opção que esconde o defeito.
+	t.Run("acima do limite", func(t *testing.T) {
+		pasta := numaPastaTemporariaDe(t, "f11", "nota-longa.yaml")
+		codigo, stdout, stderr := executa("render", "nota-longa.yaml")
+		if codigo != 1 {
+			t.Errorf("código = %d, queria 1", codigo)
+		}
+		if !strings.Contains(stderr, "a Nota tem 201 runas, acima do limite de 200; encurte-a") {
+			t.Errorf("stderr = %q, queria a recusa da Nota comprida", stderr)
+		}
+		if !strings.Contains(stdout, ".webp") || len(listaDeArquivos(t, pasta)) != 2 {
+			t.Errorf("stdout = %q: a imagem tinha que sair assim mesmo", stdout)
+		}
+	})
 }
 
 // TestEspacoDeLarguraZeroNaoVazaInfinito: dividir a largura necessária por um
